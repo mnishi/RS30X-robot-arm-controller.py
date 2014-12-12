@@ -1,0 +1,3 @@
+[submodule "RS30X.py"]
+	path = RS30X.py
+	url = https://github.com/mnishi/RS30X.py
