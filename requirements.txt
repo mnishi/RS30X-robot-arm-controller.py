@@ -1,2 +1,6 @@
 pyserial
+greenlet
+gevent
+numpy
+enum34
 
