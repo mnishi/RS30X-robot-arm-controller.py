@@ -18,7 +18,7 @@ class Joint:
 
 class Controller:
     EMsgKey = enum.Enum("EMsgKey", "type target callback")
-    EConType = enum.Enum("EConType", "move_ptp torque")
+    EConType = enum.Enum("EConType", "move_ptp torque home")
     EStatKey = enum.Enum("EStatKey", "pose")
 
     @classmethod
@@ -44,7 +44,7 @@ class Controller:
                 pass
             elif msg[Controller.EMsgKey.type] is Controller.EConType.torque:
                 target = msg[Controller.EMsgKey.target]
-                Logger.log(Logger.ELogLevel.TRACE, "target = %d", target)
+                Logger.log(Logger.ELogLevel.INFO_, "target = %d", target)
                 for id in range(6):
                     if target is True:
                         self.controller.torqueOn(id)
@@ -53,26 +53,28 @@ class Controller:
                 if msg[Controller.EMsgKey.callback] is not None:
                     msg[Controller.EMsgKey.callback].set()
 
+            elif msg[Controller.EMsgKey.type] is Controller.EConType.home:
+                for id in range(6):
+                    self.controller.move(id, 0, 100)
+                gevent.sleep(1)
+                if msg[Controller.EMsgKey.callback] is not None:
+                    msg[Controller.EMsgKey.callback].set()
+
             elif msg[Controller.EMsgKey.type] is Controller.EConType.move_ptp:
-                Logger.log(Logger.ELogLevel.TRACE, "move_ptp start")
+                Logger.log(Logger.ELogLevel.INFO_, "move_ptp start")
                 trajectory = []     
                 for i in range(6): 
                     trajectory.append(Trajectory.interporate_5poly(self.status[Controller.EStatKey.pose].data[i], msg[Controller.EMsgKey.target].data[i], self.controll_period, self.max_speed))
                 periods = len(trajectory[0]) 
+                interval = self.controll_period / 1000.0
                 
                 for period in range(periods):
                     Logger.log(Logger.ELogLevel.TRACE, "period = %d", period)
                     params = []
-                    interval = self.controll_period / 500.0
 
                     for id in range(6):
-                        if period < (periods - 1):
-                            param = RS30XParameter(id, Controller.tenth_deg(trajectory[i][period + 1]), int(self.controll_period * 2))
-                            params.append(param)
-                            interval = self.controll_period / 1000.0
-                        else:
-                            param = RS30XParameter(id, Controller.tenth_deg(trajectory[i][period]), int(self.controll_period))
-                            params.append(param)
+                        param = RS30XParameter(id, Controller.tenth_deg(trajectory[i][period]), int(self.controll_period))
+                        params.append(param)
                     self.controller.move(params)
                     gevent.sleep(interval)
 
@@ -81,6 +83,7 @@ class Controller:
 
                 if msg[Controller.EMsgKey.callback] is not None:
                     msg[Controller.EMsgKey.callback].set()
+                Logger.log(Logger.ELogLevel.INFO_, "move_ptp end")
             else:
                 Logger.log(Logger.ELogLevel.ERROR, "invalid message type, msg = %s", msg)
             
@@ -113,6 +116,13 @@ class Controller:
                 }
         self.__send_message_wait_reply(message)
 
+    def home(self):
+        callback = AsyncResult()
+        message = {
+                Controller.EMsgKey.type: Controller.EConType.home, 
+                Controller.EMsgKey.callback: callback
+                }
+        self.__send_message_wait_reply(message)
 
 class Trajectory:
     @classmethod
@@ -127,12 +137,12 @@ class Trajectory:
         controll_period = float(controll_period_)
         max_speed = float(max_speed_)
         last_period = cls.get_last_period(src, dest, controll_period, max_speed)
-        Logger.log(Logger.ELogLevel.TRACE, "interporate_5poly start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
+        Logger.log(Logger.ELogLevel.INFO_, "interporate_5poly start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
         
         for i in range(1, last_period + 1, 1):
             pos = cls.resolve_5poly(src, dest, i, last_period)
             trajectory.append(pos)
-            Logger.log(Logger.ELogLevel.TRACE, "period = %d, pos = %f", i, pos)
+            Logger.log(Logger.ELogLevel.DEBUG, "period = %d, pos = %f", i, pos)
 
         return trajectory
 
@@ -149,7 +159,7 @@ if __name__ == '__main__':
     Logger.log(Logger.ELogLevel.INFO_, "main start")
     c = Controller()
     c.torque(True)
-    time.sleep(1)
+    c.home()
     c.move_ptp(Joint(30.0, 30.0, 30.0, 30.0, 30.0, 30.0))
     c.move_ptp(Joint(-60.0, -60.0, -60.0, -60.0, -60.0, -60.0))
     c.move_ptp(Joint(90.0, 90.0, 90.0, 90.0, 90.0, 90.0))
