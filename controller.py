@@ -56,7 +56,8 @@ class Joint:
 
 class Kinematics:
     EKinErr = enum.Enum("EKinErr", "none out_of_range no_solution")
-    
+    EPS = np.finfo(np.float).eps
+
     def __init__(self, la = 30.0, lb = 0.0, lc = 40.0, ld = 0.0, le = 0.0, lf  = 30.0, lg = 30.0, joint_limit = 150.0):
         self.la = la
         self.lb = lb
@@ -138,14 +139,14 @@ class Kinematics:
         Logger.log(Logger.ELogLevel.TRACE, "T(3->6) =\n%s", t36)
         Logger.log(Logger.ELogLevel.TRACE, "T(B->6) =\n%s", tb6)
         Logger.log(Logger.ELogLevel.TRACE, "T(6->H) =\n%s", t6h)
-        Logger.log(Logger.ELogLevel.INFO_, "T(B->H) =\n%s", tbh)
+        Logger.log(Logger.ELogLevel.TRACE, "T(B->H) =\n%s", tbh)
         return Kinematics.mat2pose(tbh)
 
     @classmethod
     def mat2pose(cls, mat):
         pose = Pose(mat[(0,3)], mat[(1,3)], mat[(2,3)])
         cy = np.sqrt(mat[(2,1)]**2.0 + mat[(2,2)]**2.0)
-        if cy == 0.0:
+        if cy < Kinematics.EPS:
             pose.data[3] = 0.0
             if mat[(2,0)] < 0.0:
                 pose.data[4] = 90.0
@@ -167,19 +168,19 @@ class Kinematics:
         sx = np.sin(np.deg2rad(p.rx()))
         sy = np.sin(np.deg2rad(p.ry()))
         sz = np.sin(np.deg2rad(p.rz()))
-        nx = cz * cy
-        ny = sz * cy
-        nz = -sy
-        sx = -sz*cx + cz*sy*sx
-        sy = cz*cx + sz*sy*sx
-        sz = cy*sx
-        ax = sz*sx + cz*sy*cx
-        ay = -cz*sx + sz*sy*cx
-        az = cy*cx
+        r11 = cz * cy
+        r21 = sz * cy
+        r31 = -sy
+        r12 = -sz*cx + cz*sy*sx
+        r22 = cz*cx + sz*sy*sx
+        r32 = cy*sx
+        r13 = sz*sx + cz*sy*cx
+        r23 = -cz*sx + sz*sy*cx
+        r33 = cy*cx
         mat = np.matrix([
-            [ nx, sx, ax, p.px()],
-            [ ny, sy, ay, p.py()],
-            [ nz, sz, az, p.pz()],
+            [ r11, r12, r13, p.px()],
+            [ r21, r22, r23, p.py()],
+            [ r31, r32, r33, p.pz()],
             [  0,  0,  0, 1    ]])
         return mat
 
@@ -188,17 +189,13 @@ class Kinematics:
         j1 = []
 
         tbh = Kinematics.pose2mat(pose)
-        print(tbh)
         t6h = self.__get_t6h()
-        print(t6h)
         inv_t6h = np.linalg.inv(t6h)
-        print(inv_t6h)
         tb6 = np.dot(tbh, inv_t6h)
-        print(tb6)
         t06 = tb6
         t06[(2,3)] = t06[(2,3)] - self.la
         p = Kinematics.mat2pose(t06)
-        print(p)
+
         lbd = self.lb - self.ld
         px2ppy2 = p.px() ** 2.0 + p.py() ** 2.0
         sqr_px2ppy2 = np.sqrt(px2ppy2)
@@ -207,7 +204,7 @@ class Kinematics:
         if np.abs(a) > 1.0:
             return Kinematics.EKinErr.no_solution, None
     
-        if px2ppy2 == 0.0:
+        if px2ppy2 < Kinematics.EPS:
             if self.lb != self.ld:
                 return Kinematics.EKinErr.no_solution, None
             else:
@@ -218,7 +215,7 @@ class Kinematics:
 
         px2ppy2ppz2 = px2ppy2 + p.pz() ** 2.0
 
-        if px2ppy2ppz2 == 0.0:
+        if px2ppy2ppz2 < Kinematics.EPS:
             return Kinematics.EKinErr.out_of_range, None
 
         sol123 = []
@@ -232,7 +229,7 @@ class Kinematics:
             return Kinematics.EKinErr.no_solution, None
 
         for i in range(len(sol123)):
-            err, sol456 = self.__inverse456(p, Joint(sol123[i][0], sol123[i][1], sol123[i][2]))
+            err, sol456 = self.__inverse456(t06, Joint(sol123[i][0], sol123[i][1], sol123[i][2]))
             if err is Kinematics.EKinErr.none:    
                 sol.extend(sol456)
 
@@ -241,30 +238,31 @@ class Kinematics:
 
         return Kinematics.EKinErr.none, sol
         
-    def __inverse456(self, p, j):
+    def __inverse456(self, t06, j):
         sol = []
         j4 = []
         t03 = self.__get_t03(j)
-        t06 = Kinematics.pose2mat(p)
         t36 = np.dot(np.linalg.inv(t03), t06)
         ax = t36[(0,2)]
         ay = t36[(1,2)]
+        az = t36[(2,2)]
         ax2pay2 = (ax**2.0 + ay**2.0)
-        if ax2pay2 == 0.0:
+        
+        if ax2pay2 < Kinematics.EPS:
             j4.append(0.0)
         else:
             j4.append(np.arctan(ay/ax))
             j4.append(np.arctan(ay/ax) + np.pi)
-
+        
         for i in range(len(j4)):
             if np.abs(j4[i]) <= self.joint_limit_rad:
                 j5 = None
                 j6 = None
-                if ax2pay2 != 0.0:
+                if ax2pay2 > Kinematics.EPS:
                     j5, j6 = self.__inverse56(t36, j4[i])
                 else:
-                    #j5, j6 = self.__inverse56(t36, j4[i])
-                    pass
+                    j5, j6 = self.__inverse56(t36, j4[i])
+                    j5 = np.pi / 2.0 * ( 1.0 - az)
 
                 if np.abs(j5) <= self.joint_limit_rad and np.abs(j6) <= self.joint_limit_rad:
                     sol.append(Joint(j.j1(),j.j2(),j.j3(),j4[i],j5,j6).rad2deg())
@@ -311,9 +309,9 @@ class Kinematics:
 
         for i in range(len(z)):
             j2, j3 = self.__inverseZ(p, b, z[i])
-            Logger.log(Logger.ELogLevel.INFO_, "j1 = %-8.3f, j2 = %-8.3f, j3 = %-8.3f" % (np.rad2deg(j1), np.rad2deg(j2), np.rad2deg(j3)))
             if np.abs(j2) <= self.joint_limit_rad and np.abs(j3) <= self.joint_limit_rad:
                 ret.append([j1,j2,j3])
+                Logger.log(Logger.ELogLevel.INFO_, "inverse kinematics solution j123, j1 = %-8.3f, j2 = %-8.3f, j3 = %-8.3f" % (np.rad2deg(j1), np.rad2deg(j2), np.rad2deg(j3)))
         if len(ret) == 0:
             return Kinematics.EKinErr.out_of_range, None
 
@@ -413,11 +411,12 @@ class Controller:
     
     def __update_pose(self):
         self.status[Controller.EStatKey.pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
-        Logger.log(Logger.ELogLevel.INFO_, "joint = %s, pose = %s", self.status[Controller.EStatKey.joint], self.status[Controller.EStatKey.pose])
+        Logger.log(Logger.ELogLevel.INFO_, "update_pose, joint = %s", self.status[Controller.EStatKey.joint])
+        Logger.log(Logger.ELogLevel.INFO_, "update_pose, pose = %s", self.status[Controller.EStatKey.pose])
         err, sol = self.kinematics.inverse(self.status[Controller.EStatKey.pose])
         if err is Kinematics.EKinErr.none:
             for i in range(len(sol)):
-                Logger.log(Logger.ELogLevel.INFO_, "inverse kinematics solution = %s" % sol[i])
+                Logger.log(Logger.ELogLevel.INFO_, "inverse kinematics solution check = %s" % sol[i])
         else:
             Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s" % err.name)
 
@@ -497,16 +496,7 @@ if __name__ == '__main__':
     c.torque(True)
     c.home()
     c.move_ptp(Joint(   0.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint(  30.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint(  45.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint(  60.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint(  90.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint( 120.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint( 150.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint( -30.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint( -45.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint( -60.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint( -90.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint(-120.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-    #c.move_ptp(Joint(-150.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    c.move_ptp(Joint(  30.0, 30.0, 0.0, 0.0, 30.0, 0.0))
+    c.move_ptp(Joint( -60.0,-60.0, 0.0, 0.0,-60.0, 0.0))
+    #c.move_ptp(Joint(  90.0, 90.0, 0.0, 0.0, 90.0, 0.0))
     c.torque(False)
