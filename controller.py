@@ -375,7 +375,7 @@ class Kinematics:
             j2, j3 = self.__inverseZ(p, b, z[i])
             if np.abs(j2) <= self.joint_limit_rad and np.abs(j3) <= self.joint_limit_rad:
                 ret.append([j1,j2,j3])
-                Logger.log(Logger.ELogLevel.DEBUG, "inverse kinematics solution j123, j1 = %-8.3f, j2 = %-8.3f, j3 = %-8.3f" % (np.rad2deg(j1), np.rad2deg(j2), np.rad2deg(j3)))
+                Logger.log(Logger.ELogLevel.TRACE, "inverse kinematics solution j123, j1 = %-8.3f, j2 = %-8.3f, j3 = %-8.3f" % (np.rad2deg(j1), np.rad2deg(j2), np.rad2deg(j3)))
         if len(ret) == 0:
             return Kinematics.EKinErr.out_of_range, None
 
@@ -558,7 +558,7 @@ class Trajectory:
         for i in range(1, last_period + 1, 1):
             pos = cls.resolve_poly5d(src, dest, i, last_period)
             trajectory.append(pos)
-            Logger.log(Logger.ELogLevel.DEBUG, "period = %d, pos = %f", i, pos)
+            Logger.log(Logger.ELogLevel.TRACE, "period = %d, pos = %f", i, pos)
 
         return trajectory
 
@@ -581,7 +581,7 @@ if __name__ == '__main__':
     c.move_ptp(Pose(  30.0,   0.0,  30.0,  90.0,   0.0,   0.0))
     c.move_ptp(Pose(  30.0,  30.0,  30.0,  90.0,   0.0, -90.0))
     c.move_ptp(Pose(  30.0,  30.0,  30.0,  90.0, 120.0, -90.0))
-    c.move_ptp(Pose(  30.0,  30.0,  30.0, -90.0,-120.0,  90.0))
+    c.move_ptp(Pose(  30.0,  30.0,  30.0, -60.0, -30.0,  60.0))
     #c.move_ptp(Joint(  30.0,  30.0, 0.0, 0.0,  30.0, 0.0))
     #c.move_ptp(Joint( -60.0, -60.0, 0.0, 0.0, -60.0, 0.0))
     #c.move_ptp(Joint(  90.0,  90.0, 0.0, 0.0,  90.0, 0.0))
