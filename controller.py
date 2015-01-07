@@ -6,7 +6,10 @@ import enum
 import gevent
 from gevent.queue import Queue
 from gevent.event import AsyncResult
+from flask import Flask, render_template
+from geventwebsocket import WebSocketServer, WebSocketApplication, Resource
 from RS30X.RS30X import *
+from application import RS30XControllerWebSocketApp
 
 class Pose:
     def __init__(self, px = 0.0, py = 0.0, pz = 0.0, rx = 0.0, ry = 0.0, rz = 0.0):
@@ -389,7 +392,7 @@ class Kinematics:
         return (Kinematics.nomalize_rad(j2), Kinematics.nomalize_rad(j3))
 
 class Controller:
-    EMsgKey = enum.Enum("EMsgKey", "type target callback")
+    EMsgKey = enum.Enum("EMsgKey", "msg_type target callback")
     EConType = enum.Enum("EConType", "move_ptp torque home")
     EStatKey = enum.Enum("EStatKey", "pose joint")
 
@@ -407,9 +410,10 @@ class Controller:
         self.controller = RS30XController()
         self.kinematics = Kinematics()
         self.queue = Queue()
-        gevent.spawn(self.__hundle_massage)
+        self.notifier = None
+        gevent.spawn(self.__handle_massage)
 
-    def __hundle_massage(self):
+    def __handle_massage(self):
         msg = None
         while True:
             msg = self.queue.get()
@@ -417,7 +421,7 @@ class Controller:
             
             if msg is None:
                 pass
-            elif msg[Controller.EMsgKey.type] is Controller.EConType.torque:
+            elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.torque:
                 target = msg[Controller.EMsgKey.target]
                 Logger.log(Logger.ELogLevel.INFO_, "torque, target = %d", target)
                 for id in range(6):
@@ -427,7 +431,7 @@ class Controller:
                         self.controller.torqueOff(id)
                 self.__callback(msg) 
 
-            elif msg[Controller.EMsgKey.type] is Controller.EConType.home:
+            elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.home:
                 home_position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 for id in range(6):
                     self.controller.move(id, home_position[id], 300)
@@ -436,7 +440,7 @@ class Controller:
                 self.__update_pose()
                 self.__callback(msg) 
 
-            elif msg[Controller.EMsgKey.type] is Controller.EConType.move_ptp:
+            elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.move_ptp:
                 Logger.log(Logger.ELogLevel.INFO_, "move_ptp, start")
                 trajectory = []
                 target = msg[Controller.EMsgKey.target]
@@ -479,8 +483,8 @@ class Controller:
 
                 for id in range(6):
                     self.status[Controller.EStatKey.joint].data[id] = target.data[id]
+                    self.__update_pose()
 
-                self.__update_pose()
                 self.__callback(msg) 
                 Logger.log(Logger.ELogLevel.INFO_, "move_ptp, end")
             
@@ -489,17 +493,20 @@ class Controller:
             
             gevent.sleep(0)
     
-    def __update_pose(self):
+    def __update_pose(self, report = True):
         self.status[Controller.EStatKey.pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
-        Logger.log(Logger.ELogLevel.INFO_, "update_pose, joint = %s", self.status[Controller.EStatKey.joint])
-        Logger.log(Logger.ELogLevel.INFO_, "update_pose, pose = %s", self.status[Controller.EStatKey.pose])
-        if Logger.level.value >= Logger.ELogLevel.DEBUG.value:
-            err, sol = self.kinematics.inverse(self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint])
-            if err is Kinematics.EKinErr.none:
-                if sol != self.status[Controller.EStatKey.joint]:
-                    Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics solution does not correspond, result = %s", sol)
-            else:
-                Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
+        if self.notifier is not None:
+            self.notifier()
+        if report is True: 
+            Logger.log(Logger.ELogLevel.INFO_, "update_pose, joint = %s", self.status[Controller.EStatKey.joint])
+            Logger.log(Logger.ELogLevel.INFO_, "update_pose, pose = %s", self.status[Controller.EStatKey.pose])
+            if Logger.level.value >= Logger.ELogLevel.DEBUG.value:
+                err, sol = self.kinematics.inverse(self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint])
+                if err is Kinematics.EKinErr.none:
+                    if sol != self.status[Controller.EStatKey.joint]:
+                        Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics solution does not correspond, result = %s", sol)
+                else:
+                    Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
 
     def __callback(self, msg, value = None):
         if msg[Controller.EMsgKey.callback] is not None:
@@ -514,11 +521,11 @@ class Controller:
         gevent.spawn(self.__receive_message, message).join()
         Logger.log(Logger.ELogLevel.TRACE, "message replied, msg = %s", message)
 
-    def move_ptp(self, joint):
+    def move_ptp(self, target):
         callback = AsyncResult()
         message = {
-                Controller.EMsgKey.type: Controller.EConType.move_ptp, 
-                Controller.EMsgKey.target: joint,
+                Controller.EMsgKey.msg_type: Controller.EConType.move_ptp, 
+                Controller.EMsgKey.target: target,
                 Controller.EMsgKey.callback: callback
                 }
         self.__send_message_wait_reply(message)
@@ -526,7 +533,7 @@ class Controller:
     def torque(self, target = True):
         callback = AsyncResult()
         message = {
-                Controller.EMsgKey.type: Controller.EConType.torque, 
+                Controller.EMsgKey.msg_type: Controller.EConType.torque, 
                 Controller.EMsgKey.target: target,
                 Controller.EMsgKey.callback: callback
                 }
@@ -535,10 +542,13 @@ class Controller:
     def home(self):
         callback = AsyncResult()
         message = {
-                Controller.EMsgKey.type: Controller.EConType.home, 
+                Controller.EMsgKey.msg_type: Controller.EConType.home, 
                 Controller.EMsgKey.callback: callback
                 }
         self.__send_message_wait_reply(message)
+
+    def set_notifier(self, notifier):
+        self.notifier = notifier
 
 class Trajectory:
     @classmethod
@@ -553,7 +563,7 @@ class Trajectory:
         controll_period = float(controll_period_)
         max_speed = float(max_speed_)
         last_period = cls.get_last_period(src, dest, controll_period, max_speed)
-        Logger.log(Logger.ELogLevel.INFO_, "interporate_5poly start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
+        Logger.log(Logger.ELogLevel.INFO_, "interporate_poly5d start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
         
         for i in range(1, last_period + 1, 1):
             pos = cls.resolve_poly5d(src, dest, i, last_period)
@@ -573,23 +583,36 @@ class Trajectory:
 #
 if __name__ == '__main__':
     Logger.log(Logger.ELogLevel.INFO_, "main start")
-    c = Controller()
-    c.torque(True)
-    c.home()
-    c.move_ptp(Joint(   0.0,   0.0, 0.0, 0.0,   0.0, 0.0))
-    c.move_ptp(Pose(  30.0,   0.0,  30.0, 180.0,   0.0,   0.0))
-    c.move_ptp(Pose(  30.0,   0.0,  30.0,  90.0,   0.0,   0.0))
-    c.move_ptp(Pose(  30.0,  30.0,  30.0,  90.0,   0.0, -90.0))
-    c.move_ptp(Pose(  30.0,  30.0,  30.0,  90.0, 120.0, -90.0))
-    c.move_ptp(Pose(  30.0,  30.0,  30.0, -60.0, -30.0,  60.0))
-    #c.move_ptp(Joint(  30.0,  30.0, 0.0, 0.0,  30.0, 0.0))
-    #c.move_ptp(Joint( -60.0, -60.0, 0.0, 0.0, -60.0, 0.0))
-    #c.move_ptp(Joint(  90.0,  90.0, 0.0, 0.0,  90.0, 0.0))
-    #c.move_ptp(Joint(-120.0,-120.0, 0.0, 0.0,-120.0, 0.0))
-    #c.move_ptp(Joint( 150.0, 150.0, 0.0, 0.0, 150.0, 0.0))
-    #c.move_ptp(Joint(-150.0,-150.0, 0.0, 0.0,-150.0, 0.0))
-    #c.move_ptp(Joint( 120.0, 120.0, 0.0, 0.0, 120.0, 0.0))
-    #c.move_ptp(Joint( -90.0, -90.0, 0.0, 0.0, -90.0, 0.0))
-    #c.move_ptp(Joint(  60.0,  60.0, 0.0, 0.0,  60.0, 0.0))
-    #c.move_ptp(Joint( -30.0, -30.0, 0.0, 0.0, -30.0, 0.0))
-    c.torque(False)
+
+    address = '0.0.0.0'
+    port = 8000
+
+    if len(sys.argv) > 1:
+        address = sys.argv[1]
+
+    if len(sys.argv) > 2:
+        port = int(sys.argv[2])
+
+    controller = Controller()
+    controller.torque(True)
+    controller.home()
+
+    RS30XControllerWebSocketApp.set_controller(controller)
+
+    flask_app = Flask(__name__)
+    #flask_app.debug = True
+    
+    @flask_app.route("/")
+    def index():
+       return render_template('index.html')
+
+    server = WebSocketServer(
+            (address, port),
+            Resource({
+                '/'  : flask_app,
+                '/ws': RS30XControllerWebSocketApp
+                }),
+            debug=False
+            )
+    server.serve_forever()
+    
