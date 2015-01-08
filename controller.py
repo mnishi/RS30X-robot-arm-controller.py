@@ -478,13 +478,16 @@ class Controller:
                         if len(trajectory[id]) > period:
                             param = RS30XParameter(id, Controller.tenth_deg(trajectory[id][period]), int(self.controll_period))
                             params.append(param)
+                            if period > 0:
+                                self.status[Controller.EStatKey.joint].data[id] = trajectory[id][period - 1]
                     self.controller.move(params)
+                    self.__update_pose(False)
                     gevent.sleep(interval)
 
                 for id in range(6):
                     self.status[Controller.EStatKey.joint].data[id] = target.data[id]
-                    self.__update_pose()
 
+                self.__update_pose(True)
                 self.__callback(msg) 
                 Logger.log(Logger.ELogLevel.INFO_, "move_ptp, end")
             
