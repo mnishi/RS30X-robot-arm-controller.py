@@ -3,4 +3,5 @@ greenlet
 gevent
 numpy
 enum34
-
+flask
+gevent-websocket

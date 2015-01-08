@@ -72,7 +72,7 @@ class Joint:
         return "[%8.3f, %8.3f, %8.3f, %8.3f, %8.3f, %8.3f]" % (self.data[0],self.data[1],self.data[2],self.data[3],self.data[4],self.data[5])
 
 class Kinematics:
-    EKinErr = enum.Enum("EKinErr", "none out_of_range no_solution")
+    EKinErr = enum.Enum("EKinErr", "none out_of_range")
     EPS = 0.1 ** 12
 
     def __init__(self, la = 30.0, lb = 0.0, lc = 40.0, ld = 0.0, le = 0.0, lf  = 30.0, lg = 30.0, joint_limit = 150.0):
@@ -244,11 +244,11 @@ class Kinematics:
         a = lbd / sqr_px2ppy2
 
         if np.abs(a) > 1.0:
-            return Kinematics.EKinErr.no_solution, None
+            return Kinematics.EKinErr.out_of_range, None
     
         if px2ppy2 < Kinematics.EPS:
             if self.lb != self.ld:
-                return Kinematics.EKinErr.no_solution, None
+                return Kinematics.EKinErr.out_of_range, None
             else:
                 j1.append(0.0)
         else:
@@ -269,7 +269,7 @@ class Kinematics:
         Logger.log(Logger.ELogLevel.TRACE, "sol123 = %s", np.rad2deg(sol123)) 
 
         if len(sol123) == 0:
-            return Kinematics.EKinErr.no_solution, None
+            return Kinematics.EKinErr.out_of_range, None
         for i in range(len(sol123)):
             err, sol456 = self.__inverse456(t06, Joint(sol123[i][0], sol123[i][1], sol123[i][2]))
             if err is Kinematics.EKinErr.none:    
@@ -369,7 +369,7 @@ class Kinematics:
         c = cu / cl
 
         if np.abs(c) > 1.0:
-            return Kinematics.EKinErr.no_solution, None
+            return Kinematics.EKinErr.out_of_range, None
 
         z.append(np.arctan2(c,  np.sqrt(1.0 - c**2.0)) - e)
         z.append(np.arctan2(c, -np.sqrt(1.0 - c**2.0)) - e)

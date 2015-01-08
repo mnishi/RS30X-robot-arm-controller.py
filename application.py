@@ -82,7 +82,7 @@ class RS30XControllerWebSocketApp(WebSocketApplication):
                 RS30XControllerWebSocketApp.EMsgKey.msg_type: RS30XControllerWebSocketApp.EMsgType.jog,
                 RS30XControllerWebSocketApp.EJogParam.target_type: RS30XControllerWebSocketApp.EJogTarType.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.target_type.name]],
                 RS30XControllerWebSocketApp.EJogParam.direction: RS30XControllerWebSocketApp.EJogDir.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.direction.name]],
-                RS30XControllerWebSocketApp.EJogParam.volume: RS30XControllerWebSocketApp.EJogVol.medium,
+                RS30XControllerWebSocketApp.EJogParam.volume: RS30XControllerWebSocketApp.EJogVol.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.volume.name]]
                 }
             if msg[RS30XControllerWebSocketApp.EJogParam.target_type] is RS30XControllerWebSocketApp.EJogTarType.pose: 
                 msg[RS30XControllerWebSocketApp.EJogParam.target] = RS30XControllerWebSocketApp.EPoseComp.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.target.name]]

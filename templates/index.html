@@ -4,6 +4,10 @@
         <title>RS30X Robotic Arm Controller</title>
         <link rel="stylesheet" href="static/jquery-ui.css" />
         <style>
+            body{
+                font: 62.5% "Trebuchet MS", sans-serif;
+                margin: 50px;
+            }
             .float {
                 text-align: right;
                 width: 4em;
@@ -14,26 +18,42 @@
         <script type="text/javascript" src="static/application.js"></script>
     </head>
     <body>
-        <h1>RS30X Robotic Arm Controller</h1>
-        <div id="CONTAINER">
-            <div class="item">
-                <h3 class="header">Pose</h3>
-                <div><button id="Pose_PX_Dec">-</button><input type="text" id="Pose_PX" class="float" readonly/><input type="button" id="Pose_PX_Inc" value="+"/></div>
-                <div><button id="Pose_PY_Dec">-</button><input type="text" id="Pose_PY" class="float" readonly/><input type="button" id="Pose_PY_Inc" value="+"/></div> 
-                <div><button id="Pose_PZ_Dec">-</button><input type="text" id="Pose_PZ" class="float" readonly/><input type="button" id="Pose_PZ_Inc" value="+"/></div>
-                <div><button id="Pose_RX_Dec">-</button><input type="text" id="Pose_RX" class="float" readonly/><input type="button" id="Pose_RX_Inc" value="+"/></div>
-                <div><button id="Pose_RY_Dec">-</button><input type="text" id="Pose_RY" class="float" readonly/><input type="button" id="Pose_RY_Inc" value="+"/></div>
-                <div><button id="Pose_RZ_Dec">-</button><input type="text" id="Pose_RZ" class="float" readonly/><input type="button" id="Pose_RZ_Inc" value="+"/></div>
-            </div>
-            <div class="item">
-                <h3 class="header">Joint</h3>
-                <div><button id="Joint_J1_Dec">-</button><input type="text" id="Joint_J1" class="float" readonly/><button id="Joint_J1_Inc">+</button></div> 
-                <div><button id="Joint_J2_Dec">-</button><input type="text" id="Joint_J2" class="float" readonly/><button id="Joint_J2_Inc">+</button></div> 
-                <div><button id="Joint_J3_Dec">-</button><input type="text" id="Joint_J3" class="float" readonly/><button id="Joint_J3_Inc">+</button></div>
-                <div><button id="Joint_J4_Dec">-</button><input type="text" id="Joint_J4" class="float" readonly/><button id="Joint_J4_Inc">+</button></div>
-                <div><button id="Joint_J5_Dec">-</button><input type="text" id="Joint_J5" class="float" readonly/><button id="Joint_J5_Inc">+</button></div>
-                <div><button id="Joint_J6_Dec">-</button><input type="text" id="Joint_J6" class="float" readonly/><button id="Joint_J6_Inc">+</button></div>
-            </div>
-        </div>
+        <h2>RS30X Robotic Arm Controller</h2>
+        <table>
+            <tr>
+                <td colspan="2">
+                    <h3 class="header">Amount of Movement</h3>
+                    <div id="Volume">
+                    <input type="radio" id="Volume_Small" name="Volume" value="small"/><label for="Volume_Small">0.10</label>
+                    <input type="radio" id="Volume_Medium" name="Volume" value="medium"/><label for="Volume_Medium">1.00</label>
+                    <input type="radio" id="Volume_Large" name="Volume" value="large"/><label for="Volume_Large">10.0</label>
+                    </div> 
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <h3 class="header">Pose(mm)</h3>
+                    <table>
+                        <tr><th>PX</th><td><button id="Pose_PX_Dec">-</button><input type="text" id="Pose_PX" class="float" readonly/><input type="button" id="Pose_PX_Inc" value="+"/></td></tr>
+                        <tr><th>PY</th><td><button id="Pose_PY_Dec">-</button><input type="text" id="Pose_PY" class="float" readonly/><input type="button" id="Pose_PY_Inc" value="+"/></td></tr> 
+                        <tr><th>PZ</th><td><button id="Pose_PZ_Dec">-</button><input type="text" id="Pose_PZ" class="float" readonly/><input type="button" id="Pose_PZ_Inc" value="+"/></td></tr>
+                        <tr><th>RX</th><td><button id="Pose_RX_Dec">-</button><input type="text" id="Pose_RX" class="float" readonly/><input type="button" id="Pose_RX_Inc" value="+"/></td></tr>
+                        <tr><th>RY</th><td><button id="Pose_RY_Dec">-</button><input type="text" id="Pose_RY" class="float" readonly/><input type="button" id="Pose_RY_Inc" value="+"/></td></tr>
+                        <tr><th>RZ</th><td><button id="Pose_RZ_Dec">-</button><input type="text" id="Pose_RZ" class="float" readonly/><input type="button" id="Pose_RZ_Inc" value="+"/></td></tr>
+                    </table> 
+                </td>
+                <td>
+                    <h3 class="header">Joint(deg)</h3>
+                    <table>
+                        <tr><th>J1</th><td><button id="Joint_J1_Dec">-</button><input type="text" id="Joint_J1" class="float" readonly/><button id="Joint_J1_Inc">+</button></div></td></tr>  
+                        <tr><th>J2</th><td><button id="Joint_J2_Dec">-</button><input type="text" id="Joint_J2" class="float" readonly/><button id="Joint_J2_Inc">+</button></div></td></tr> 
+                        <tr><th>J3</th><td><button id="Joint_J3_Dec">-</button><input type="text" id="Joint_J3" class="float" readonly/><button id="Joint_J3_Inc">+</button></div></td></tr>
+                        <tr><th>J4</th><td><button id="Joint_J4_Dec">-</button><input type="text" id="Joint_J4" class="float" readonly/><button id="Joint_J4_Inc">+</button></div></td></tr>
+                        <tr><th>J5</th><td><button id="Joint_J5_Dec">-</button><input type="text" id="Joint_J5" class="float" readonly/><button id="Joint_J5_Inc">+</button></div></td></tr>
+                        <tr><th>J6</th><td><button id="Joint_J6_Dec">-</button><input type="text" id="Joint_J6" class="float" readonly/><button id="Joint_J6_Inc">+</button></div></td></tr>
+                    </table> 
+                </td>
+            </tr>
+        </table>
     </body>
 </html>
