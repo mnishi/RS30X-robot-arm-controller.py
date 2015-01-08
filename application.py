@@ -6,7 +6,7 @@ from geventwebsocket import WebSocketApplication, WebSocketError
 import enum 
 from RS30X.RS30X import *
 
-class RS30XControllerWebSocketApp(WebSocketApplication):
+class RS30XControllerWebSocketApplication(WebSocketApplication):
     EMsgKey = enum.Enum("EMsgKey", "msg_type client")
     EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog")
     EJogParam = enum.Enum("EJogParam", "target_type target direction volume")
@@ -26,30 +26,31 @@ class RS30XControllerWebSocketApp(WebSocketApplication):
         cls.controller = controller
 
     def on_open(self):
-        if RS30XControllerWebSocketApp.initialized is not True:
-            RS30XControllerWebSocketApp.controller.set_notifier(RS30XControllerWebSocketApp.notify_status)
+        if self.initialized is not True:
+            self.controller.set_notifier(self.notify_status)
             gevent.spawn(self.__handle_message)
-            RS30XControllerWebSocketApp.initialized = True
+            self.initialized = True
 
-        RS30XControllerWebSocketApp.add_client(self)
-        RS30XControllerWebSocketApp.send_status(self.ws)
+        self.add_client(self)
+        self.send_status(self.ws)
 
-    def __jog(self, msg):
+    @classmethod
+    def __jog(cls, msg):
       target = None
-      if msg[RS30XControllerWebSocketApp.EJogParam.target_type] is RS30XControllerWebSocketApp.EJogTarType.pose:
-          target = copy.deepcopy(RS30XControllerWebSocketApp.controller.status[RS30XControllerWebSocketApp.controller.EStatKey.pose]) 
+      if msg[cls.EJogParam.target_type] is cls.EJogTarType.pose:
+          target = copy.deepcopy(cls.controller.status[cls.controller.EStatKey.pose]) 
       else:
-          target = copy.deepcopy(RS30XControllerWebSocketApp.controller.status[RS30XControllerWebSocketApp.controller.EStatKey.joint]) 
-      index = msg[RS30XControllerWebSocketApp.EJogParam.target].value - 1
+          target = copy.deepcopy(cls.controller.status[cls.controller.EStatKey.joint]) 
+      index = msg[cls.EJogParam.target].value - 1
       volume = 10.0
-      if msg[RS30XControllerWebSocketApp.EJogParam.volume] is RS30XControllerWebSocketApp.EJogVol.medium:
+      if msg[cls.EJogParam.volume] is cls.EJogVol.medium:
           volume = 1.0
-      elif msg[RS30XControllerWebSocketApp.EJogParam.volume] is RS30XControllerWebSocketApp.EJogVol.small:
+      elif msg[cls.EJogParam.volume] is cls.EJogVol.small:
           volume = 0.1
-      if msg[RS30XControllerWebSocketApp.EJogParam.direction] is RS30XControllerWebSocketApp.EJogDir.dec:
+      if msg[cls.EJogParam.direction] is cls.EJogDir.dec:
           volume = -volume
       target.data[index] = target.data[index] + volume
-      RS30XControllerWebSocketApp.controller.move_ptp(target)
+      cls.controller.move_ptp(target)
 
     def __handle_message(self):
         msg = None
@@ -57,49 +58,49 @@ class RS30XControllerWebSocketApp(WebSocketApplication):
             msg = self.queue.get()
             if msg is None:
                 pass
-            elif msg[RS30XControllerWebSocketApp.EMsgKey.msg_type] is RS30XControllerWebSocketApp.EMsgType.add_client:
-                self.clients.add(msg[RS30XControllerWebSocketApp.EMsgKey.client])
-            elif msg[RS30XControllerWebSocketApp.EMsgKey.msg_type] is RS30XControllerWebSocketApp.EMsgType.remove_client:
-                self.clients.discard(msg[RS30XControllerWebSocketApp.EMsgKey.client])
-            elif msg[RS30XControllerWebSocketApp.EMsgKey.msg_type] is RS30XControllerWebSocketApp.EMsgType.jog:
+            elif msg[self.EMsgKey.msg_type] is self.EMsgType.add_client:
+                self.clients.add(msg[self.EMsgKey.client])
+            elif msg[self.EMsgKey.msg_type] is self.EMsgType.remove_client:
+                self.clients.discard(msg[self.EMsgKey.client])
+            elif msg[self.EMsgKey.msg_type] is self.EMsgType.jog:
                 self.__jog(msg)
-            elif msg[RS30XControllerWebSocketApp.EMsgKey.msg_type] is RS30XControllerWebSocketApp.EMsgType.status:
-                j = RS30XControllerWebSocketApp.jsonize_status() 
+            elif msg[self.EMsgKey.msg_type] is self.EMsgType.status:
+                j = self.jsonize_status() 
                 for client in self.clients:
-                    RS30XControllerWebSocketApp.send_status(client.ws, j)
+                    self.send_status(client.ws, j)
             else:
-                Logger.log(Logger.ELogLevel.ERROR, "invalid message, msg_type = %s", msg[RS30XControllerWebSocketApp.EMsgKey.msg_type])
+                Logger.log(Logger.ELogLevel.ERROR, "invalid message, msg_type = %s", msg[self.EMsgKey.msg_type])
             gevent.sleep(0.02)
 
     def on_message(self, recvmes):
         if recvmes is None:
             return
         recvmes = json.loads(recvmes)
-        if recvmes[RS30XControllerWebSocketApp.EMsgKey.msg_type.name] == RS30XControllerWebSocketApp.EMsgType.status.name:
-            RS30XControllerWebSocketApp.send_status(self.ws)
-        elif recvmes[RS30XControllerWebSocketApp.EMsgKey.msg_type.name] == RS30XControllerWebSocketApp.EMsgType.jog.name:
+        if recvmes[self.EMsgKey.msg_type.name] == self.EMsgType.status.name:
+            self.send_status(self.ws)
+        elif recvmes[self.EMsgKey.msg_type.name] == self.EMsgType.jog.name:
             msg = { 
-                RS30XControllerWebSocketApp.EMsgKey.msg_type: RS30XControllerWebSocketApp.EMsgType.jog,
-                RS30XControllerWebSocketApp.EJogParam.target_type: RS30XControllerWebSocketApp.EJogTarType.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.target_type.name]],
-                RS30XControllerWebSocketApp.EJogParam.direction: RS30XControllerWebSocketApp.EJogDir.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.direction.name]],
-                RS30XControllerWebSocketApp.EJogParam.volume: RS30XControllerWebSocketApp.EJogVol.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.volume.name]]
+                self.EMsgKey.msg_type: self.EMsgType.jog,
+                self.EJogParam.target_type: self.EJogTarType.__members__[recvmes[self.EJogParam.target_type.name]],
+                self.EJogParam.direction: self.EJogDir.__members__[recvmes[self.EJogParam.direction.name]],
+                self.EJogParam.volume: self.EJogVol.__members__[recvmes[self.EJogParam.volume.name]]
                 }
-            if msg[RS30XControllerWebSocketApp.EJogParam.target_type] is RS30XControllerWebSocketApp.EJogTarType.pose: 
-                msg[RS30XControllerWebSocketApp.EJogParam.target] = RS30XControllerWebSocketApp.EPoseComp.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.target.name]]
+            if msg[self.EJogParam.target_type] is self.EJogTarType.pose: 
+                msg[self.EJogParam.target] = self.EPoseComp.__members__[recvmes[self.EJogParam.target.name]]
             else:
-                msg[RS30XControllerWebSocketApp.EJogParam.target] = RS30XControllerWebSocketApp.EJointComp.__members__[recvmes[RS30XControllerWebSocketApp.EJogParam.target.name]]
-            RS30XControllerWebSocketApp.queue.put(msg)
+                msg[self.EJogParam.target] = self.EJointComp.__members__[recvmes[self.EJogParam.target.name]]
+            self.queue.put(msg)
         else:
             Logger.log(Logger.ELogLevel.ERROR, "invalid message, msg = %s", recvmes)
 
     @classmethod 
     def jsonize_status(cls):
         map = {
-            RS30XControllerWebSocketApp.controller.EStatKey.pose.name: RS30XControllerWebSocketApp.controller.status[RS30XControllerWebSocketApp.controller.EStatKey.pose].data,
-            RS30XControllerWebSocketApp.controller.EStatKey.joint.name: RS30XControllerWebSocketApp.controller.status[RS30XControllerWebSocketApp.controller.EStatKey.joint].data}
+            cls.controller.EStatKey.pose.name: cls.controller.status[cls.controller.EStatKey.pose].data,
+            cls.controller.EStatKey.joint.name: cls.controller.status[cls.controller.EStatKey.joint].data}
         j = json.dumps({
-            RS30XControllerWebSocketApp.EMsgKey.msg_type.name: RS30XControllerWebSocketApp.EMsgType.status.name,
-            RS30XControllerWebSocketApp.EMsgType.status.name: map})
+            cls.EMsgKey.msg_type.name: cls.EMsgType.status.name,
+            cls.EMsgType.status.name: map})
         return j
 
     @classmethod
@@ -113,24 +114,24 @@ class RS30XControllerWebSocketApp(WebSocketApplication):
             Logger.log(Logger.ELogLevel.INFO_, "send error, client = %s", id(ws))
 
     def on_close(self, reason):
-        RS30XControllerWebSocketApp.remove_client(self)
+        self.remove_client(self)
 
     @classmethod
     def add_client(cls, client):
         msg = { 
-            RS30XControllerWebSocketApp.EMsgKey.msg_type: RS30XControllerWebSocketApp.EMsgType.add_client,
-            RS30XControllerWebSocketApp.EMsgKey.client: client}
+            cls.EMsgKey.msg_type: cls.EMsgType.add_client,
+            cls.EMsgKey.client: client}
         cls.queue.put(msg)
 
     @classmethod
     def remove_client(cls, client):
         msg = { 
-            RS30XControllerWebSocketApp.EMsgKey.msg_type: RS30XControllerWebSocketApp.EMsgType.remove_client,
-            RS30XControllerWebSocketApp.EMsgKey.client: client}
+            cls.EMsgKey.msg_type: cls.EMsgType.remove_client,
+            cls.EMsgKey.client: client}
         cls.queue.put(msg)
 
     @classmethod
     def notify_status(cls):
-        msg = { RS30XControllerWebSocketApp.EMsgKey.msg_type: RS30XControllerWebSocketApp.EMsgType.status }
+        msg = { cls.EMsgKey.msg_type: cls.EMsgType.status }
         cls.queue.put(msg)
 
