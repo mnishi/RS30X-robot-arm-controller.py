@@ -394,7 +394,7 @@ class Kinematics:
 class Controller:
     EMsgKey = enum.Enum("EMsgKey", "msg_type target callback")
     EConType = enum.Enum("EConType", "move_ptp torque home")
-    EStatKey = enum.Enum("EStatKey", "pose joint")
+    EStatKey = enum.Enum("EStatKey", "pose joint busy")
 
     @classmethod
     def tenth_deg(cls, deg):
@@ -407,6 +407,7 @@ class Controller:
         self.status = {}
         self.status[Controller.EStatKey.pose] = Pose() 
         self.status[Controller.EStatKey.joint] = Joint() 
+        self.status[Controller.EStatKey.busy] = False 
         self.controller = RS30XController()
         self.kinematics = Kinematics()
         self.queue = Queue()
@@ -432,16 +433,19 @@ class Controller:
                 self.__callback(msg) 
 
             elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.home:
-                home_position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                self.status[Controller.EStatKey.busy] = True
+                home_position = [0.0, -45.0, 0.0, 0.0, 45.0, 0.0]
                 for id in range(6):
                     self.controller.move(id, home_position[id], 300)
                     self.status[Controller.EStatKey.joint].data[id] = home_position[id]
                 gevent.sleep(3)
+                self.status[Controller.EStatKey.busy] = False
                 self.__update_pose()
                 self.__callback(msg) 
 
             elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.move_ptp:
                 Logger.log(Logger.ELogLevel.INFO_, "move_ptp, start")
+                self.status[Controller.EStatKey.busy] = True
                 trajectory = []
                 target = msg[Controller.EMsgKey.target]
                 current = self.status[Controller.EStatKey.joint]
@@ -481,13 +485,14 @@ class Controller:
                             if period > 0:
                                 self.status[Controller.EStatKey.joint].data[id] = trajectory[id][period - 1]
                     self.controller.move(params)
-                    self.__update_pose(False)
+                    self.__update_pose(not self.status[Controller.EStatKey.busy])
                     gevent.sleep(interval)
 
                 for id in range(6):
                     self.status[Controller.EStatKey.joint].data[id] = target.data[id]
 
-                self.__update_pose(True)
+                self.status[Controller.EStatKey.busy] = False 
+                self.__update_pose(not self.status[Controller.EStatKey.busy])
                 self.__callback(msg) 
                 Logger.log(Logger.ELogLevel.INFO_, "move_ptp, end")
             
@@ -515,13 +520,10 @@ class Controller:
         if msg[Controller.EMsgKey.callback] is not None:
             msg[Controller.EMsgKey.callback].set(value)
     
-    def __receive_message(self, message):
-        message[Controller.EMsgKey.callback].get()
-
     def __send_message_wait_reply(self, message):
         self.queue.put(message)
         Logger.log(Logger.ELogLevel.TRACE, "message send, msg = %s", message)
-        gevent.spawn(self.__receive_message, message).join()
+        message[Controller.EMsgKey.callback].get()
         Logger.log(Logger.ELogLevel.TRACE, "message replied, msg = %s", message)
 
     def move_ptp(self, target):
@@ -531,7 +533,7 @@ class Controller:
                 Controller.EMsgKey.target: target,
                 Controller.EMsgKey.callback: callback
                 }
-        self.__send_message_wait_reply(message)
+        gevent.spawn(self.__send_message_wait_reply, message)
 
     def torque(self, target = True):
         callback = AsyncResult()
@@ -540,7 +542,7 @@ class Controller:
                 Controller.EMsgKey.target: target,
                 Controller.EMsgKey.callback: callback
                 }
-        self.__send_message_wait_reply(message)
+        gevent.spawn(self.__send_message_wait_reply, message)
 
     def home(self):
         callback = AsyncResult()
@@ -548,7 +550,7 @@ class Controller:
                 Controller.EMsgKey.msg_type: Controller.EConType.home, 
                 Controller.EMsgKey.callback: callback
                 }
-        self.__send_message_wait_reply(message)
+        gevent.spawn(self.__send_message_wait_reply, message)
 
     def set_notifier(self, notifier):
         self.notifier = notifier

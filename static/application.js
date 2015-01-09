@@ -14,6 +14,7 @@ ws.onopen = function(){
 $(document).ready(function(){
     $("#Volume").buttonset();
     $("#Volume_Medium").prop("checked", true);
+    $("#Volume").buttonset("refresh");
     
     $("#Pose_PX_Dec").button(); 
     $("#Pose_PY_Dec").button();
@@ -64,13 +65,23 @@ $(document).ready(function(){
     $("#Joint_J4_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j4", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
     $("#Joint_J5_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j5", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
     $("#Joint_J6_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j6", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
+
 });
 
 function toFixed(num){
     return num.toFixed(3)
 }
 
+var stat
+var stat_initialized = false
 function show_status(s){
+    stat = s
+
+    if(stat_initialized == false){
+        threeStart();
+        stat_initialized = true
+    }
+
     $("#Pose_PX").val(toFixed(s.pose[0]));    
     $("#Pose_PY").val(toFixed(s.pose[1]));    
     $("#Pose_PZ").val(toFixed(s.pose[2]));    
@@ -85,3 +96,80 @@ function show_status(s){
     $("#Joint_J5").val(toFixed(s.joint[4]));    
     $("#Joint_J6").val(toFixed(s.joint[5]));    
 }
+
+var width, height;
+var renderer;
+function initThree() {
+    width = $("#Canvas").prop('clientWidth');
+    height = $("#Canvas").prop('clientHeight');
+    renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(width, height );
+    $("#Canvas").append(renderer.domElement); 
+    renderer.setClearColor(0xFFFFFF, 1.0);
+}
+
+var camera;
+function initCamera() { 
+    camera = new THREE.PerspectiveCamera( 45 , width / height , 1 , 1000 );
+    camera.position.x = 150;
+    camera.position.y = 100;
+    camera.position.z = 100;
+    camera.up.x = 0;
+    camera.up.y = 0;
+    camera.up.z = 1;
+    camera.lookAt( {x:0, y:0, z:0 } );
+}
+
+var scene;
+function initScene() {   
+    scene = new THREE.Scene();
+}
+
+var light;
+function initLight() { 
+    light = new THREE.DirectionalLight(0xFFFFFF, 1.0, 0);
+    light.position.set( 100, 100, 200 );
+    scene.add(light);
+    light2 = new THREE.AmbientLight(0x555555);
+    scene.add(light2);    
+}
+
+var joint = new Array(8);
+function initObject(){
+    p = new THREE.Mesh(
+            new THREE.PlaneGeometry(150, 150),               
+            new THREE.MeshLambertMaterial({color: 0xBBBBBB, ambient: 0xBBBBBB})
+            );
+    scene.add(p);
+    p.position.set(0,0,0);
+
+    for(var i = 0; i < joint.length; i++){ 
+        j = new THREE.Mesh(
+                new THREE.BoxGeometry(5, 5, 2),               
+                new THREE.MeshLambertMaterial({color: 0x6495ed, ambient: 0x6495ed})
+                );
+        scene.add(j);
+        j.position.set(0,0,0);
+        j.rotation.order = "ZYX";
+        j.rotation.set(0,0,0);
+        joint[i] = j
+    }
+}
+
+function threeStart() {
+    initThree();
+    initCamera();
+    initScene();   
+    initLight();
+    initObject();
+    renderThree();
+}
+
+function renderThree() {
+    joint[7].position.set(stat.pose[0], stat.pose[1], stat.pose[2]);
+    joint[7].rotation.set(stat.pose[3] * Math.PI / 180, stat.pose[4] * Math.PI / 180, stat.pose[5] * Math.PI / 180);
+    renderer.clear(); 
+    renderer.render(scene, camera);
+    window.requestAnimationFrame(renderThree);
+}
+

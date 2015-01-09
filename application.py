@@ -97,7 +97,8 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
     def jsonize_status(cls):
         map = {
             cls.controller.EStatKey.pose.name: cls.controller.status[cls.controller.EStatKey.pose].data,
-            cls.controller.EStatKey.joint.name: cls.controller.status[cls.controller.EStatKey.joint].data}
+            cls.controller.EStatKey.joint.name: cls.controller.status[cls.controller.EStatKey.joint].data,
+            cls.controller.EStatKey.busy.name: cls.controller.status[cls.controller.EStatKey.busy]}
         j = json.dumps({
             cls.EMsgKey.msg_type.name: cls.EMsgType.status.name,
             cls.EMsgType.status.name: map})
@@ -105,6 +106,7 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
 
     @classmethod
     def send_status(cls, ws, jsonized_status = None):
+        Logger.log(Logger.ELogLevel.TRACE, "send_status, start")
         j = jsonized_status 
         if j is None:
             j = cls.jsonize_status()
@@ -112,6 +114,7 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
             ws.send(j)
         except:
             Logger.log(Logger.ELogLevel.INFO_, "send error, client = %s", id(ws))
+        Logger.log(Logger.ELogLevel.TRACE, "send_status, end")
 
     def on_close(self, reason):
         self.remove_client(self)
@@ -132,6 +135,13 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
 
     @classmethod
     def notify_status(cls):
+        Logger.log(Logger.ELogLevel.TRACE, "notify_status, start")
         msg = { cls.EMsgKey.msg_type: cls.EMsgType.status }
+        gevent.spawn(cls.put_message, msg)
+        Logger.log(Logger.ELogLevel.TRACE, "notify_status, end")
+
+    @classmethod
+    def put_message(cls, msg):
         cls.queue.put(msg)
+
 
