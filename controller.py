@@ -75,7 +75,7 @@ class Kinematics:
     EKinErr = enum.Enum("EKinErr", "none out_of_range")
     EPS = 0.1 ** 12
 
-    def __init__(self, la = 30.0, lb = 0.0, lc = 40.0, ld = 0.0, le = 0.0, lf  = 30.0, lg = 30.0, joint_limit = 150.0):
+    def __init__(self, la = 70.0, lb = 20.0, lc = 40.0, ld = 10.0, le = 0.0, lf  = 30.0, lg = 30.0, joint_limit = 150.0):
         self.la = la
         self.lb = lb
         self.lc = lc
@@ -486,7 +486,7 @@ class Controller:
 
             elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.home:
                 self.status[Controller.EStatKey.busy] = True
-                home_position = [0.0, -45.0, 0.0, 0.0, 45.0, 0.0]
+                home_position = [0.0, 0.0, -60.0, 0.0, 60.0, 0.0]
                 for id in range(6):
                     self.controller.move(id, home_position[id], 300)
                     self.status[Controller.EStatKey.joint].data[id] = home_position[id]

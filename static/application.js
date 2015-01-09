@@ -118,7 +118,9 @@ function initCamera() {
     camera.up.x = 0;
     camera.up.y = 0;
     camera.up.z = 1;
-    camera.lookAt( {x:0, y:0, z:0 } );
+    camera.lookAt( {x:0, y:0, z:50 } );
+    var controls = new THREE.OrbitControls(camera);  
+    controls.update(); 
 }
 
 var scene;
@@ -169,7 +171,12 @@ function renderLink(initialize){
 
     for(var i = 0; i < (joint.length - 1); i++){
         if(initialize == true){
-            if(i == 3){
+            if(i == 2){
+                l = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.5, getLinkLength(jp[i], jp[i + 1]), 2.5),               
+                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
+                        );
+            }else if(i == 3){
                 l = new THREE.Mesh(
                         new THREE.BoxGeometry(getLinkLength(jp[i], jp[i + 1]), 2.5, 2.5),               
                         new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
