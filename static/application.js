@@ -104,6 +104,7 @@ function initThree() {
     height = $("#Canvas").prop('clientHeight');
     renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(width, height );
+    renderer.shadowMapEnabled = true;
     $("#Canvas").append(renderer.domElement); 
     renderer.setClearColor(0xFFFFFF, 1.0);
 }
@@ -128,13 +129,14 @@ function initScene() {
 var light;
 function initLight() { 
     light = new THREE.DirectionalLight(0xFFFFFF, 1.0, 0);
-    light.position.set( 100, 100, 200 );
+    light.position.set( 150, 150, 300 );
+    light.castShadow = true;
     scene.add(light);
     light2 = new THREE.AmbientLight(0x555555);
     scene.add(light2);    
 }
 
-var joint = new Array(8);
+var joint = new Array(9);
 function initObject(){
     p = new THREE.Mesh(
             new THREE.PlaneGeometry(150, 150),               
@@ -142,6 +144,7 @@ function initObject(){
             );
     scene.add(p);
     p.position.set(0,0,0);
+    p.receiveShadow = true;
 
     for(var i = 0; i < joint.length; i++){ 
         j = new THREE.Mesh(
@@ -152,8 +155,58 @@ function initObject(){
         j.position.set(0,0,0);
         j.rotation.order = "ZYX";
         j.rotation.set(0,0,0);
+        j.castShadow = true;
+        j.Shadow = true;
         joint[i] = j
     }
+}
+
+var link = new Array(8);
+function renderLink(initialize){
+    jp = Array(1);
+    jp[0] = [0, 0, 0, 0, 0, 0]
+    jp = jp.concat(stat.joint_pose)
+
+    for(var i = 0; i < (joint.length - 1); i++){
+        if(initialize == true){
+            if(i == 3){
+                l = new THREE.Mesh(
+                        new THREE.BoxGeometry(getLinkLength(jp[i], jp[i + 1]), 2.5, 2.5),               
+                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
+                        );
+            }else if(i == 4){
+                l = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.5, getLinkLength(jp[i], jp[i + 1]), 2.5),               
+                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
+                        );
+            }else{
+                l = new THREE.Mesh(
+                        new THREE.BoxGeometry(2.5, 2.5, getLinkLength(jp[i], jp[i + 1])),               
+                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
+                        );
+            }
+            scene.add(l);
+            l.castShadow = true;
+            l.Shadow = true;
+            l.rotation.order = "ZYX";
+            link[i] = l
+        }
+        c = getLinkCenter(jp[i], jp[i + 1]);
+        link[i].position.set(c[0], c[1],c[2]);
+        link[i].rotation.set(jp[i][3], jp[i][4], jp[i][5]);
+    }
+}
+
+function getLinkLength(src, dest){
+   return Math.pow(Math.pow(dest[0] - src[0], 2) + Math.pow(dest[1] - src[1], 2) + Math.pow(dest[2] - src[2], 2), 0.5)  
+}
+
+function getLinkCenter(src, dest){
+    center = Array(3);
+    center[0] = (dest[0] + src[0]) / 2;
+    center[1] = (dest[1] + src[1]) / 2;
+    center[2] = (dest[2] + src[2]) / 2;
+    return center;
 }
 
 function threeStart() {
@@ -162,12 +215,16 @@ function threeStart() {
     initScene();   
     initLight();
     initObject();
+    renderLink(true);
     renderThree();
 }
 
 function renderThree() {
-    joint[7].position.set(stat.pose[0], stat.pose[1], stat.pose[2]);
-    joint[7].rotation.set(stat.pose[3] * Math.PI / 180, stat.pose[4] * Math.PI / 180, stat.pose[5] * Math.PI / 180);
+    for(var i = 1; i < joint.length; i++){
+        joint[i].position.set(stat.joint_pose[i-1][0], stat.joint_pose[i-1][1], stat.joint_pose[i-1][2]);
+        joint[i].rotation.set(stat.joint_pose[i-1][3], stat.joint_pose[i-1][4], stat.joint_pose[i-1][5]);
+    }
+    renderLink(false);
     renderer.clear(); 
     renderer.render(scene, camera);
     window.requestAnimationFrame(renderThree);

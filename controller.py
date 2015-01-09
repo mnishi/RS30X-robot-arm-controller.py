@@ -153,30 +153,78 @@ class Kinematics:
                 [  0.0, 0.0, 0.0,     1.0 ]])
         return t6h
         
-    def forward(self, j):
-        t03_ = self.__get_t03_(j.deg2rad())
-        j_ = j.deg2rad()
-        j_.data[4] = -j_.data[4]
-        t36_ = self.__get_t36_(j_)
-        t06 = np.dot(t03_, t36_)
-        la = np.matrix([
+    def forward(self, joint):
+        j = joint.deg2rad()
+        s1 = np.sin(j.j1())
+        s2 = np.sin(j.j2())
+        s3 = np.sin(j.j3())
+        s4 = np.sin(j.j4())
+        s5 = np.sin(j.j5())
+        s6 = np.sin(j.j6())
+        c1 = np.cos(j.j1())
+        c2 = np.cos(j.j2())
+        c3 = np.cos(j.j3())
+        c4 = np.cos(j.j4())
+        c5 = np.cos(j.j5())
+        c6 = np.cos(j.j6())
+        lbd = self.lb - self.ld
+        tb0 = np.matrix([
                 [  0.0, 0.0, 0.0,     0.0 ],
                 [  0.0, 0.0, 0.0,     0.0 ],
                 [  0.0, 0.0, 0.0, self.la ],
                 [  0.0, 0.0, 0.0,     0.0 ]])
-        tb6 = t06 + la
+        t01 = np.matrix([
+                [   c1, -s1, 0.0,     0.0 ],
+                [   s1,  c1, 0.0,     0.0 ],
+                [  0.0, 0.0, 1.0,     0.0 ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
+        t12 = np.matrix([
+                [   c2, -s2, 0.0,     0.0 ],
+                [  0.0, 0.0, 1.0,     lbd ],
+                [  -s2, -c2, 0.0,     0.0 ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
+        t23 = np.matrix([
+                [   c3, -s3, 0.0, self.lc ],
+                [   s3,  c3, 0.0,     0.0 ],
+                [  0.0, 0.0, 1.0,     0.0 ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
+        t34 = np.matrix([
+                [   c4, -s4, 0.0, self.le ],
+                [  0.0, 0.0, 1.0, self.lf ],
+                [  -s4, -c4, 0.0,     0.0 ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
+        t45 = np.matrix([
+                [   c5, -s5, 0.0,     0.0 ],
+                [  0.0, 0.0,-1.0,     0.0 ],
+                [   s5,  c5, 0.0,     0.0 ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
+        t56 = np.matrix([
+                [   c6, -s6, 0.0,     0.0 ],
+                [  0.0, 0.0, 1.0,     0.0 ],
+                [  -s6, -c6, 0.0,     0.0 ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
         t6h = self.__get_t6h()
+        tb1 = tb0 + t01
+        tb2 = np.dot(tb1, t12)
+        tb3 = np.dot(tb2, t23)
+        tb4 = np.dot(tb3, t34)
+        tb5 = np.dot(tb4, t45)
+        tb6 = np.dot(tb5, t56)
         tbh = np.dot(tb6, t6h)
-        Logger.log(Logger.ELogLevel.TRACE, "t03_=\n%s", t03_)
-        Logger.log(Logger.ELogLevel.TRACE, "t36_=\n%s", t36_)
-        Logger.log(Logger.ELogLevel.TRACE, "t06 =\n%s", t06)
-        Logger.log(Logger.ELogLevel.TRACE, "tb6 =\n%s", tb6)
-        Logger.log(Logger.ELogLevel.TRACE, "t6h =\n%s", t6h)
-        Logger.log(Logger.ELogLevel.TRACE, "tbh =\n%s", tbh)
-        return Kinematics.mat2pose(tbh)
+        joints = []
+        joints.append(self.mat2pose(tb0, False))
+        joints.append(self.mat2pose(tb1, False))
+        joints.append(self.mat2pose(tb2, False))
+        joints.append(self.mat2pose(tb3, False))
+        joints.append(self.mat2pose(tb4, False))
+        joints.append(self.mat2pose(tb5, False))
+        joints.append(self.mat2pose(tb6, False))
+        joints.append(self.mat2pose(tbh, False))
+
+        return Kinematics.mat2pose(tbh), joints 
 
     @classmethod
-    def mat2pose(cls, mat):
+    def mat2pose(cls, mat, deg = True):
         pose = Pose(mat[(0,3)], mat[(1,3)], mat[(2,3)])
         cy = np.sqrt(mat[(2,1)]**2.0 + mat[(2,2)]**2.0)
         if cy < Kinematics.EPS:
@@ -188,9 +236,13 @@ class Kinematics:
                 pose.data[4] = -90.0
                 pose.data[5] = -np.rad2deg(np.arctan2(mat[(0,1)], mat[(1,1)]))
         else:
-            pose.data[3] = np.rad2deg(np.arctan2(mat[(2,1)], mat[(2,2)]))
-            pose.data[4] = np.rad2deg(np.arctan2(-mat[(2,0)], cy))
-            pose.data[5] = np.rad2deg(np.arctan2(mat[(1,0)], mat[(0,0)]))
+            pose.data[3] = np.arctan2(mat[(2,1)], mat[(2,2)])
+            pose.data[4] = np.arctan2(-mat[(2,0)], cy)
+            pose.data[5] = np.arctan2(mat[(1,0)], mat[(0,0)])
+            if deg is True:
+                pose.data[3] = np.rad2deg(pose.data[3])
+                pose.data[4] = np.rad2deg(pose.data[4])
+                pose.data[5] = np.rad2deg(pose.data[5])
         return pose
 
     @classmethod
@@ -394,7 +446,7 @@ class Kinematics:
 class Controller:
     EMsgKey = enum.Enum("EMsgKey", "msg_type target callback")
     EConType = enum.Enum("EConType", "move_ptp torque home")
-    EStatKey = enum.Enum("EStatKey", "pose joint busy")
+    EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose")
 
     @classmethod
     def tenth_deg(cls, deg):
@@ -502,7 +554,7 @@ class Controller:
             gevent.sleep(0)
     
     def __update_pose(self, report = True):
-        self.status[Controller.EStatKey.pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
+        self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint_pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
         if self.notifier is not None:
             self.notifier()
         if report is True: 
