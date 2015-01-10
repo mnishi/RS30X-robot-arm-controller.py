@@ -75,7 +75,10 @@ class Kinematics:
     EKinErr = enum.Enum("EKinErr", "none out_of_range")
     EPS = 0.1 ** 12
 
-    def __init__(self, la = 70.0, lb = 20.0, lc = 40.0, ld = 10.0, le = 0.0, lf  = 30.0, lg = 30.0, joint_limit = 150.0):
+    def __init__(self, la = 70.0, lb = 20.0, lc = 40.0, ld = 10.0, le = 0.0, lf  = 30.0, lg = 30.0, 
+            j1_limit_min = -150.0, j2_limit_min = -150.0, j3_limit_min = -240.0, j4_limit_min = -150.0, j5_limit_min = -150.0, j6_limit_min = -150.0, 
+            j1_limit_max =  150.0, j2_limit_max =  150.0, j3_limit_max =   60.0, j4_limit_max =  150.0, j5_limit_max =  150.0, j6_limit_max =  150.0, 
+            ):
         self.la = la
         self.lb = lb
         self.lc = lc
@@ -83,8 +86,15 @@ class Kinematics:
         self.le = le
         self.lf = lf
         self.lg = lg
-        self.joint_limit_deg = joint_limit + Kinematics.EPS
-        self.joint_limit_rad = np.deg2rad(joint_limit) + Kinematics.EPS
+        self.joint_limit_deg = [
+                [j1_limit_min - Kinematics.EPS, j1_limit_max + Kinematics.EPS],
+                [j2_limit_min - Kinematics.EPS, j2_limit_max + Kinematics.EPS],
+                [j3_limit_min - Kinematics.EPS, j3_limit_max + Kinematics.EPS],
+                [j4_limit_min - Kinematics.EPS, j4_limit_max + Kinematics.EPS],
+                [j5_limit_min - Kinematics.EPS, j5_limit_max + Kinematics.EPS],
+                [j6_limit_min - Kinematics.EPS, j6_limit_max + Kinematics.EPS]
+                ]
+        self.joint_limit_rad = np.deg2rad(self.joint_limit_deg)
     
     def __get_t03_(self, j):
         s23 = np.sin(j.j2() + j.j3())
@@ -230,19 +240,19 @@ class Kinematics:
         if cy < Kinematics.EPS:
             pose.data[3] = 0.0
             if mat[(2,0)] < 0.0:
-                pose.data[4] = 90.0
-                pose.data[5] = np.rad2deg(np.arctan2(mat[(0,1)], mat[(1,1)]))
+                pose.data[4] = np.pi
+                pose.data[5] = np.arctan2(mat[(0,1)], mat[(1,1)])
             else:
-                pose.data[4] = -90.0
-                pose.data[5] = -np.rad2deg(np.arctan2(mat[(0,1)], mat[(1,1)]))
+                pose.data[4] = -np.pi
+                pose.data[5] = -np.arctan2(mat[(0,1)], mat[(1,1)])
         else:
             pose.data[3] = np.arctan2(mat[(2,1)], mat[(2,2)])
             pose.data[4] = np.arctan2(-mat[(2,0)], cy)
             pose.data[5] = np.arctan2(mat[(1,0)], mat[(0,0)])
-            if deg is True:
-                pose.data[3] = np.rad2deg(pose.data[3])
-                pose.data[4] = np.rad2deg(pose.data[4])
-                pose.data[5] = np.rad2deg(pose.data[5])
+        if deg is True:
+            pose.data[3] = np.rad2deg(pose.data[3])
+            pose.data[4] = np.rad2deg(pose.data[4])
+            pose.data[5] = np.rad2deg(pose.data[5])
         return pose
 
     @classmethod
@@ -313,7 +323,7 @@ class Kinematics:
             return Kinematics.EKinErr.out_of_range, None
         sol123 = []
         for i in range(len(j1)):
-            if np.abs(j1[i]) <= self.joint_limit_rad:
+            if j1[i] <= self.joint_limit_rad[0][1] and j1[i] >= self.joint_limit_rad[0][0]:
                 err, tmp = self.__inverse23(p, j1[i])
                 if err is Kinematics.EKinErr.none:
                     sol123.extend(tmp)
@@ -374,7 +384,7 @@ class Kinematics:
         Logger.log(Logger.ELogLevel.TRACE, "j4 = %s", np.rad2deg(j4)) 
 
         for i in range(len(j4)):
-            if np.abs(j4[i]) <= self.joint_limit_rad:
+            if j4[i] <= self.joint_limit_rad[3][1] and j4[i] >= self.joint_limit_rad[3][0]:
                 j5 = None
                 j6 = None
                 if ax2pay2 > Kinematics.EPS:
@@ -383,7 +393,7 @@ class Kinematics:
                     j5, j6 = self.__inverse56(t36_, j4[i])
                     j5 = Kinematics.nomalize_rad(np.pi / 2.0 * ( 1.0 - az))
 
-                if np.abs(j5) <= self.joint_limit_rad and np.abs(j6) <= self.joint_limit_rad:
+                if j5 <= self.joint_limit_rad[4][1] and j5 >= self.joint_limit_rad[4][0] and j6 <= self.joint_limit_rad[5][1] and j6 >= self.joint_limit_rad[5][0] :
                     sol.append(Joint(j.j1(),j.j2(),j.j3(),j4[i],-j5,j6).rad2deg())
 
         if len(sol) == 0:
@@ -428,7 +438,7 @@ class Kinematics:
 
         for i in range(len(z)):
             j2, j3 = self.__inverseZ(p, b, z[i])
-            if np.abs(j2) <= self.joint_limit_rad and np.abs(j3) <= self.joint_limit_rad:
+            if j2 <= self.joint_limit_rad[1][1] and j2 >= self.joint_limit_rad[1][0] and j3 <= self.joint_limit_rad[2][1] and j3 >= self.joint_limit_rad[2][0] :
                 ret.append([j1,j2,j3])
                 Logger.log(Logger.ELogLevel.TRACE, "inverse kinematics solution j123, j1 = %-8.3f, j2 = %-8.3f, j3 = %-8.3f" % (np.rad2deg(j1), np.rad2deg(j2), np.rad2deg(j3)))
         if len(ret) == 0:
@@ -486,7 +496,7 @@ class Controller:
 
             elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.home:
                 self.status[Controller.EStatKey.busy] = True
-                home_position = [0.0, 0.0, -60.0, 0.0, 60.0, 0.0]
+                home_position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 for id in range(6):
                     self.controller.move(id, home_position[id], 300)
                     self.status[Controller.EStatKey.joint].data[id] = home_position[id]
@@ -509,6 +519,16 @@ class Controller:
                         Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
                         self.__callback(msg, err)
                         continue
+
+                err = Kinematics.EKinErr.none 
+                for id in range(6):
+                    if target.data[id] <= self.kinematics.joint_limit_deg[id][0] or target.data[id] >= self.kinematics.joint_limit_deg[id][1]:
+                        err = Kinematics.EKinErr.out_of_range 
+                        Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
+                        self.__callback(msg, err)
+                if err is not Kinematics.EKinErr.none:
+                    continue
+
 
                 Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
                 for id in range(6): 
@@ -564,7 +584,7 @@ class Controller:
                 err, sol = self.kinematics.inverse(self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint])
                 if err is Kinematics.EKinErr.none:
                     if sol != self.status[Controller.EStatKey.joint]:
-                        Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics solution does not correspond, result = %s", sol)
+                        Logger.log(Logger.ELogLevel.WARN_, "inverse kinematics solution does not correspond, result = %s", sol)
                 else:
                     Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
 
