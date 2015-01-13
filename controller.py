@@ -75,7 +75,7 @@ class Kinematics:
     EKinErr = enum.Enum("EKinErr", "none out_of_range")
     EPS = 0.1 ** 12
 
-    def __init__(self, la = 70.0, lb = 20.0, lc = 40.0, ld = 10.0, le = 0.0, lf  = 30.0, lg = 30.0, 
+    def __init__(self, la = 70.0, lb = 20.0, lc = 40.0, ld = 10.0, le = 10.0, lf  = 30.0, lg = 30.0, 
             j1_limit_min = -150.0, j2_limit_min = -150.0, j3_limit_min = -240.0, j4_limit_min = -150.0, j5_limit_min = -150.0, j6_limit_min = -150.0, 
             j1_limit_max =  150.0, j2_limit_max =  150.0, j3_limit_max =   60.0, j4_limit_max =  150.0, j5_limit_max =  150.0, j6_limit_max =  150.0, 
             ):
@@ -190,7 +190,7 @@ class Kinematics:
                 [  0.0, 0.0, 0.0,     1.0 ]])
         t12 = np.matrix([
                 [   c2, -s2, 0.0,     0.0 ],
-                [  0.0, 0.0, 1.0,     lbd ],
+                [  0.0, 0.0, 1.0, self.lb ],
                 [  -s2, -c2, 0.0,     0.0 ],
                 [  0.0, 0.0, 0.0,     1.0 ]])
         t23 = np.matrix([
@@ -198,10 +198,20 @@ class Kinematics:
                 [   s3,  c3, 0.0,     0.0 ],
                 [  0.0, 0.0, 1.0,     0.0 ],
                 [  0.0, 0.0, 0.0,     1.0 ]])
+        t2d = np.matrix([
+                [   c3, -s3, 0.0, self.lc ],
+                [   s3,  c3, 0.0,     0.0 ],
+                [  0.0, 0.0, 1.0,-self.ld ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
+        t3e = np.matrix([
+                [   c4, -s4, 0.0, self.le ],
+                [  0.0, 0.0, 1.0,     0.0 ],
+                [  -s4, -c4, 0.0,-self.ld ],
+                [  0.0, 0.0, 0.0,     1.0 ]])
         t34 = np.matrix([
                 [   c4, -s4, 0.0, self.le ],
                 [  0.0, 0.0, 1.0, self.lf ],
-                [  -s4, -c4, 0.0,     0.0 ],
+                [  -s4, -c4, 0.0,-self.ld ],
                 [  0.0, 0.0, 0.0,     1.0 ]])
         t45 = np.matrix([
                 [   c5, -s5, 0.0,     0.0 ],
@@ -217,21 +227,43 @@ class Kinematics:
         tb1 = tb0 + t01
         tb2 = np.dot(tb1, t12)
         tb3 = np.dot(tb2, t23)
+        tbd = np.dot(tb2, t2d)
+        tbe = np.dot(tb3, t3e)
         tb4 = np.dot(tb3, t34)
         tb5 = np.dot(tb4, t45)
         tb6 = np.dot(tb5, t56)
         tbh = np.dot(tb6, t6h)
+        pose_tb0 = self.mat2pose(tb0, False) 
+        pose_tb1 = self.mat2pose(tb1, False)
+        pose_tb2 = self.mat2pose(tb2, False)
+        pose_tb3 = self.mat2pose(tb3, False)
+        pose_tbd = self.mat2pose(tbd, False)
+        pose_tbe = self.mat2pose(tbe, False)
+        pose_tb4 = self.mat2pose(tb4, False)
+        pose_tb5 = self.mat2pose(tb5, False)
+        pose_tb6 = self.mat2pose(tb6, False)
+        pose_tbh = self.mat2pose(tbh, False)
         joints = []
-        joints.append(self.mat2pose(tb0, False))
-        joints.append(self.mat2pose(tb1, False))
-        joints.append(self.mat2pose(tb2, False))
-        joints.append(self.mat2pose(tb3, False))
-        joints.append(self.mat2pose(tb4, False))
-        joints.append(self.mat2pose(tb5, False))
-        joints.append(self.mat2pose(tb6, False))
-        joints.append(self.mat2pose(tbh, False))
-
-        return Kinematics.mat2pose(tbh), joints 
+        joints.append(pose_tb0)
+        joints.append(pose_tb1)
+        joints.append(pose_tb2)
+        joints.append(pose_tb3)
+        joints.append(pose_tb4)
+        joints.append(pose_tb5)
+        joints.append(pose_tb6)
+        joints.append(pose_tbh)
+        links = []
+        links.append(pose_tb0)
+        links.append(pose_tb1)
+        links.append(pose_tb2)
+        links.append(pose_tb3)
+        links.append(pose_tbd)
+        links.append(pose_tbe)
+        links.append(pose_tb4)
+        links.append(pose_tb5)
+        links.append(pose_tb6)
+        links.append(pose_tbh)
+        return Kinematics.mat2pose(tbh), joints, links 
 
     @classmethod
     def mat2pose(cls, mat, deg = True):
@@ -456,7 +488,7 @@ class Kinematics:
 class Controller:
     EMsgKey = enum.Enum("EMsgKey", "msg_type target callback")
     EConType = enum.Enum("EConType", "move_ptp torque home")
-    EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose")
+    EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose link_pose")
 
     @classmethod
     def tenth_deg(cls, deg):
@@ -574,7 +606,7 @@ class Controller:
             gevent.sleep(0)
     
     def __update_pose(self, report = True):
-        self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint_pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
+        self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint_pose], self.status[Controller.EStatKey.link_pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
         if self.notifier is not None:
             self.notifier()
         if report is True: 

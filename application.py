@@ -103,6 +103,10 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
         for i in range(len(cls.controller.status[cls.controller.EStatKey.joint_pose])):
             joints.append(cls.controller.status[cls.controller.EStatKey.joint_pose][i].data)
         map[cls.controller.EStatKey.joint_pose.name] = joints
+        links = []
+        for i in range(len(cls.controller.status[cls.controller.EStatKey.link_pose])):
+            links.append(cls.controller.status[cls.controller.EStatKey.link_pose][i].data)
+        map[cls.controller.EStatKey.link_pose.name] = links
 
         j = json.dumps({
             cls.EMsgKey.msg_type.name: cls.EMsgType.status.name,

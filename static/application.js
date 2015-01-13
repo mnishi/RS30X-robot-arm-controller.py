@@ -163,32 +163,32 @@ function initObject(){
     }
 }
 
-var link = new Array(8);
+var link = new Array(11);
 function renderLink(initialize){
-    jp = Array(1);
-    jp[0] = [0, 0, 0, 0, 0, 0]
-    jp = jp.concat(stat.joint_pose)
+    lp = Array(1);
+    lp[0] = [0, 0, 0, 0, 0, 0]
+    lp = lp.concat(stat.link_pose)
 
-    for(var i = 0; i < (joint.length - 1); i++){
+    for(var i = 0; i < (link.length - 1); i++){
         if(initialize == true){
             if(i == 2){
                 l = new THREE.Mesh(
-                        new THREE.BoxGeometry(2.5, getLinkLength(jp[i], jp[i + 1]), 2.5),               
+                        new THREE.BoxGeometry(2.5, getLinkLength(lp[i], lp[i + 1]), 2.5),               
                         new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
                         );
             }else if(i == 3){
                 l = new THREE.Mesh(
-                        new THREE.BoxGeometry(getLinkLength(jp[i], jp[i + 1]), 2.5, 2.5),               
+                        new THREE.BoxGeometry(getLinkLength(lp[i], lp[i + 1]), 2.5, 2.5),               
                         new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
                         );
-            }else if(i == 4){
+            }else if(i == 5){
                 l = new THREE.Mesh(
-                        new THREE.BoxGeometry(2.5, getLinkLength(jp[i], jp[i + 1]), 2.5),               
+                        new THREE.BoxGeometry(getLinkLength(lp[i], lp[i + 1]) + 2.5, 2.5, 2.5),               
                         new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
                         );
             }else{
                 l = new THREE.Mesh(
-                        new THREE.BoxGeometry(2.5, 2.5, getLinkLength(jp[i], jp[i + 1])),               
+                        new THREE.BoxGeometry(2.5, 2.5, getLinkLength(lp[i], lp[i + 1])),               
                         new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
                         );
             }
@@ -198,9 +198,9 @@ function renderLink(initialize){
             l.rotation.order = "ZYX";
             link[i] = l
         }
-        c = getLinkCenter(jp[i], jp[i + 1]);
+        c = getLinkCenter(lp[i], lp[i + 1]);
         link[i].position.set(c[0], c[1],c[2]);
-        link[i].rotation.set(jp[i][3], jp[i][4], jp[i][5]);
+        link[i].rotation.set(lp[i][3], lp[i][4], lp[i][5]);
     }
 }
 
