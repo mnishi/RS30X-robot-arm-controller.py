@@ -112,13 +112,13 @@ function initThree() {
 var camera;
 function initCamera() { 
     camera = new THREE.PerspectiveCamera( 45 , width / height , 1 , 1000 );
-    camera.position.x = 150;
-    camera.position.y = 100;
-    camera.position.z = 100;
+    camera.position.x = 300;
+    camera.position.y = 250;
+    camera.position.z = 250;
     camera.up.x = 0;
     camera.up.y = 0;
     camera.up.z = 1;
-    camera.lookAt( {x:0, y:0, z:50 } );
+    camera.lookAt( {x:0, y:0, z:100 } );
     var controls = new THREE.OrbitControls(camera);  
     controls.update(); 
 }
@@ -141,7 +141,7 @@ function initLight() {
 var joint = new Array(9);
 function initObject(){
     p = new THREE.Mesh(
-            new THREE.PlaneGeometry(150, 150),               
+            new THREE.PlaneGeometry(400, 400),               
             new THREE.MeshLambertMaterial({color: 0xBBBBBB, ambient: 0xBBBBBB})
             );
     scene.add(p);
@@ -150,7 +150,7 @@ function initObject(){
 
     for(var i = 0; i < joint.length; i++){ 
         j = new THREE.Mesh(
-                new THREE.BoxGeometry(5, 5, 2),               
+                new THREE.BoxGeometry(10, 10, 3),               
                 new THREE.MeshLambertMaterial({color: 0x6495ed, ambient: 0x6495ed})
                 );
         scene.add(j);
@@ -171,21 +171,10 @@ function renderLink(initialize){
 
     for(var i = 0; i < (link.length - 1); i++){
         if(initialize == true){
-            if(i == 2){
-                l = new THREE.Mesh(
-                        new THREE.BoxGeometry(2.5, getLinkLength(lp[i], lp[i + 1]), 2.5),               
-                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
-                        );
-            }else if(i == 3){
-                l = new THREE.Mesh(
-                        new THREE.BoxGeometry(getLinkLength(lp[i], lp[i + 1]), 2.5, 2.5),               
-                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
-                        );
-            }else if(i == 5){
-                l = new THREE.Mesh(
-                        new THREE.BoxGeometry(getLinkLength(lp[i], lp[i + 1]) + 2.5, 2.5, 2.5),               
-                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
-                        );
+            if(i == 2 || i == 6){
+                l = createLink(0, getLinkLength(lp[i], lp[i + 1]), 0);               
+            }else if(i == 3 || i == 5){
+                l = createLink(getLinkLength(lp[i], lp[i + 1]), 0, 0);               
             }else{
                 l = new THREE.Mesh(
                         new THREE.BoxGeometry(2.5, 2.5, getLinkLength(lp[i], lp[i + 1])),               
@@ -202,6 +191,13 @@ function renderLink(initialize){
         link[i].position.set(c[0], c[1],c[2]);
         link[i].rotation.set(lp[i][3], lp[i][4], lp[i][5]);
     }
+}
+
+function createLink(xoffset, yoffset, zoffset){
+    return new THREE.Mesh(
+            new THREE.BoxGeometry(2.5 + xoffset, 2.5 + yoffset, 2.5 + zoffset),               
+            new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
+            );
 }
 
 function getLinkLength(src, dest){

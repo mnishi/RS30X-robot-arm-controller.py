@@ -75,8 +75,12 @@ class Kinematics:
     EKinErr = enum.Enum("EKinErr", "none out_of_range")
     EPS = 0.1 ** 12
 
-    def __init__(self, la = 70.0, lb = 20.0, lc = 40.0, ld = 10.0, le = 10.0, lf  = 30.0, lg = 30.0, 
-            j1_limit_min = -150.0, j2_limit_min = -150.0, j3_limit_min = -240.0, j4_limit_min = -150.0, j5_limit_min = -150.0, j6_limit_min = -150.0, 
+    @classmethod
+    def nearly_equals(cls, a, b):
+        return np.abs(a - b) <= cls.EPS
+    
+    def __init__(self, la = (80.0 + 31.0), lb = 18.2, lc = (34.0 + 60.8), ld = 9.1, le = 9.1, lf  = (31.0 + 17.0 + 30.4), lg = 31.0, 
+            j1_limit_min = -150.0, j2_limit_min = -150.0, j3_limit_min = -150.0, j4_limit_min = -150.0, j5_limit_min = -150.0, j6_limit_min = -150.0, 
             j1_limit_max =  150.0, j2_limit_max =  150.0, j3_limit_max =   60.0, j4_limit_max =  150.0, j5_limit_max =  150.0, j6_limit_max =  150.0, 
             ):
         self.la = la
@@ -149,6 +153,16 @@ class Kinematics:
                 [ 0.0, 0.0, 1.0, 0.0 ],
                 [ 0.0, 0.0, 0.0, 1.0 ]])
         return rz
+    
+    @classmethod
+    def get_trans(cls, x, y, z):
+        trans = np.matrix([
+                [ 1.0, 0.0, 0.0,   x ], 
+                [ 0.0, 1.0, 0.0,   y ],
+                [ 0.0, 0.0, 1.0,   z ],
+                [ 0.0, 0.0, 0.0, 1.0 ]])
+        return trans 
+
 
     def __get_t36_(self, j):
         tmp = np.dot(Kinematics.get_rz(j.j4()), Kinematics.get_ry(j.j5()))
@@ -203,10 +217,10 @@ class Kinematics:
                 [   s3,  c3, 0.0,     0.0 ],
                 [  0.0, 0.0, 1.0,-self.ld ],
                 [  0.0, 0.0, 0.0,     1.0 ]])
-        t3e = np.matrix([
-                [   c4, -s4, 0.0, self.le ],
+        tde = np.matrix([
+                [  1.0, 0.0, 0.0, self.le ],
+                [  0.0, 1.0, 0.0,     0.0 ],
                 [  0.0, 0.0, 1.0,     0.0 ],
-                [  -s4, -c4, 0.0,-self.ld ],
                 [  0.0, 0.0, 0.0,     1.0 ]])
         t34 = np.matrix([
                 [   c4, -s4, 0.0, self.le ],
@@ -228,7 +242,7 @@ class Kinematics:
         tb2 = np.dot(tb1, t12)
         tb3 = np.dot(tb2, t23)
         tbd = np.dot(tb2, t2d)
-        tbe = np.dot(tb3, t3e)
+        tbe = np.dot(tbd, tde)
         tb4 = np.dot(tb3, t34)
         tb5 = np.dot(tb4, t45)
         tb6 = np.dot(tb5, t56)
@@ -272,11 +286,10 @@ class Kinematics:
         if cy < Kinematics.EPS:
             pose.data[3] = 0.0
             if mat[(2,0)] < 0.0:
-                pose.data[4] = np.pi
-                pose.data[5] = np.arctan2(mat[(0,1)], mat[(1,1)])
+                pose.data[4] = np.pi / 2.0
             else:
-                pose.data[4] = -np.pi
-                pose.data[5] = -np.arctan2(mat[(0,1)], mat[(1,1)])
+                pose.data[4] = -np.pi / 2.0
+            pose.data[5] = np.arctan2(-mat[(0,1)], mat[(1,1)])
         else:
             pose.data[3] = np.arctan2(mat[(2,1)], mat[(2,2)])
             pose.data[4] = np.arctan2(-mat[(2,0)], cy)
@@ -311,11 +324,12 @@ class Kinematics:
             [  0,  0,  0, 1    ]])
         return mat
 
-    def inverse(self, pose, joint = Joint()):
-        sol = []
-        j1 = []
-
+    def pose2t06(self, pose):
         tbh = Kinematics.pose2mat(pose)
+        Logger.log(Logger.ELogLevel.TRACE, "tbh =\n%s", tbh)
+        return self.mat2t06(tbh)
+
+    def mat2t06(self, tbh):
         t6h = self.__get_t6h()
         inv_t6h = np.linalg.inv(t6h)
         tb6 = np.dot(tbh, inv_t6h)
@@ -325,12 +339,19 @@ class Kinematics:
                 [  0.0, 0.0, 0.0, self.la ],
                 [  0.0, 0.0, 0.0,     0.0 ]])
         t06 = tb6 - la
-        p = Kinematics.mat2pose(t06)
 
         Logger.log(Logger.ELogLevel.TRACE, "t06 =\n%s", t06)
         Logger.log(Logger.ELogLevel.TRACE, "tb6 =\n%s", tb6)
         Logger.log(Logger.ELogLevel.TRACE, "t6h =\n%s", t6h)
-        Logger.log(Logger.ELogLevel.TRACE, "tbh =\n%s", tbh)
+
+        return t06
+
+    def inverse(self, pose, joint = Joint()):
+        sol = []
+        j1 = []
+       
+        t06 = self.pose2t06(pose) 
+        p = Kinematics.mat2pose(t06)
 
         lbd = self.lb - self.ld
         px2ppy2 = p.px() ** 2.0 + p.py() ** 2.0
@@ -506,6 +527,7 @@ class Controller:
         self.kinematics = Kinematics()
         self.queue = Queue()
         self.notifier = None
+        self.trajectory = Trajectory(self)
         gevent.spawn(self.__handle_massage)
 
     def __handle_massage(self):
@@ -528,7 +550,7 @@ class Controller:
 
             elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.home:
                 self.status[Controller.EStatKey.busy] = True
-                home_position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                home_position = [0.0, -45.0, 0.0, 0.0, -45.0, 0.0]
                 for id in range(6):
                     self.controller.move(id, home_position[id], 300)
                     self.status[Controller.EStatKey.joint].data[id] = home_position[id]
@@ -565,10 +587,9 @@ class Controller:
                 Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
                 for id in range(6): 
                     trajectory.append(
-                            Trajectory.interporate_poly5d(
+                            self.trajectory.interporate_joint(
                                 current.data[id], 
                                 target.data[id], 
-                                self.controll_period, 
                                 self.max_speed))
                 
                 periods = 0 
@@ -660,32 +681,90 @@ class Controller:
         self.notifier = notifier
 
 class Trajectory:
-    @classmethod
-    def get_last_period(cls, src, dest, controll_period, max_speed):
-        return int( np.ceil( np.abs ( ( 15.0 * ( dest - src ) / ( 8.0 * max_speed ) ) / controll_period ) ) )
+    def __init__(self, controller):
+        self.controller = controller
+    
+    def get_last_period_poly5d(self, src, dest, max_speed):
+        return int( np.ceil( np.abs ( ( 15.0 * ( dest - src ) / ( 8.0 * max_speed ) ) / self.controller.controll_period ) ) )
 
-    @classmethod
-    def interporate_poly5d(cls, src_, dest_, controll_period_, max_speed_):
+    def get_last_period_space(self, src_pose, dest_pose, max_speed):
+        dx = dest_pose.px() - src_pose.px()
+        dy = dest_pose.py() - src_pose.py()
+        dz = dest_pose.pz() - src_pose.pz()
+        dest = (dx ** 2.0 + dy ** 2.0 + dz ** 2.0) ** 0.5
+        return self.get_last_period_poly5d(self, 0.0, dest, max_speed)
+
+    def interporate_joint(self, src_, dest_, max_speed_):
         trajectory = []
         src = float(src_)
         dest = float(dest_)
-        controll_period = float(controll_period_)
+        controll_period = float(self.controller.controll_period)
         max_speed = float(max_speed_)
-        last_period = cls.get_last_period(src, dest, controll_period, max_speed)
+        last_period = self.get_last_period_poly5d(src, dest, max_speed)
         Logger.log(Logger.ELogLevel.INFO_, "interporate_poly5d start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
         
         for i in range(1, last_period + 1, 1):
-            pos = cls.resolve_poly5d(src, dest, i, last_period)
+            pos = self.resolve_poly5d(src, dest, i, last_period)
             trajectory.append(pos)
             Logger.log(Logger.ELogLevel.TRACE, "period = %d, pos = %f", i, pos)
 
         return trajectory
 
-    @classmethod
-    def resolve_poly5d(cls, src, dest, period_, last_period_):
+    def resolve_poly5d(self, src, dest, period_, last_period_):
         period = float(period_)
         last_period = float(last_period_)
         return src + ( dest - src ) * ( ( period / last_period ) ** 3.0 ) * ( 10.0 - 15.0 * period / last_period + 6.0 * ( ( period / last_period ) ** 2.0 ) )
+
+    def interporate_space(self, src_pose, src_joint, dest_pose, max_speed_):
+        trajectory = []
+        tbh_src = src_pose.pose2mat()
+        tbh_dest = dest_pose.pose2mat()
+        inv_tbh_src = np.linalg.inv(tbh_src)
+        dtf = np.dot(inv_tbh_src, tbh_dest)
+        a3 = dtf[(2,2)]
+        a3a3 = a3 ** 2.0
+        controll_period = float(self.controller.controll_period)
+        max_speed = float(max_speed_)
+        last_period = self.get_last_period_space(src_pose, dest_pose, max_speed)
+        l = (dtf[(0,2)] ** 2.0 + dtf[(1,2)] ** 2.0) ** 0.5
+        dest_alpha = np.arctan2(l, dtf[(2,2)])
+        dest_beta = np.arctan2(dtf[(1,0)] - dtf[(0,2)], dtf[(0,0)] + dtf[(1,2)])
+        b = np.matrix([
+            [-dtf[(1,2)]],
+            [dtf[(0,2)]],
+            [0.0]
+            ])
+        b = b / l
+        bx = b[(0,0)]
+        by = b[(1,0)]
+        bz = b[(2,0)]
+        i3 = numpy.matrix(numpy.indentity(3))
+        lamda_b = np.matrix([
+            [0.0,-bz, by],
+            [ bz,0.0,-bx],
+            [-by, bx,0.0]
+            ])
+       
+        last_joint = src_joint
+        for i in range(1, last_period + 1, 1):
+            x = self.resolve_poly5d(0.0, dest_pose.px() - src_pose.px(), i, last_period)
+            y = self.resolve_poly5d(0.0, dest_pose.py() - src_pose.py(), i, last_period)
+            z = self.resolve_poly5d(0.0, dest_pose.pz() - src_pose.pz(), i, last_period)
+            if self.controller.kinematics.nearly_equals(a3a3, 1.0):
+                alpha_t = self.resolve_poly5d(0.0, dest_alpha, i. last_period)
+                c_alpha_t = np.cos(alpha_t)
+                v_alpha_t = 1.0 - c_alpha_t
+                s_alpha_t = np.sin(alpha_t)
+                rot_b = c_alpha_t * i3 + v_alpha_t * np.dot(b, b.T) + s_alpha_t * lamda_b
+                rot_b = np.c_[rot_b, np.matrix([[0.0],[0.0],[0.0]])]
+                rot_b = np.r_[rot_b, np.matrix([[0.0, 0.0, 0.0, 1.0]])]
+                beta_t = self.resolve_poly5d(0.0, dest_alpha, i. last_period)
+                rot_z = self.controller.kinematics.get_rz(beta_t)
+                dt = np.dot(self.controller.kinematics.get_trans(x,y,z), rot_b)
+                dt = np.dot(dt, rot_z)
+                np.dot(tbh_src, dt)
+
+        return trajectory
 
 #
 # main code
