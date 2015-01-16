@@ -284,6 +284,7 @@ class Kinematics:
         pose = Pose(mat[(0,3)], mat[(1,3)], mat[(2,3)])
         cy = np.sqrt(mat[(2,1)]**2.0 + mat[(2,2)]**2.0)
         if cy < Kinematics.EPS:
+            print "cy == 0"
             pose.data[3] = 0.0
             if mat[(2,0)] < 0.0:
                 pose.data[4] = np.pi / 2.0
@@ -291,6 +292,7 @@ class Kinematics:
                 pose.data[4] = -np.pi / 2.0
             pose.data[5] = np.arctan2(-mat[(0,1)], mat[(1,1)])
         else:
+            print "cy != 0"
             pose.data[3] = np.arctan2(mat[(2,1)], mat[(2,2)])
             pose.data[4] = np.arctan2(-mat[(2,0)], cy)
             pose.data[5] = np.arctan2(mat[(1,0)], mat[(0,0)])
@@ -346,11 +348,16 @@ class Kinematics:
 
         return t06
 
-    def inverse(self, pose, joint = Joint()):
+    def inverse(self, target, joint = Joint()):
         sol = []
         j1 = []
-       
-        t06 = self.pose2t06(pose) 
+        
+        p = None
+        t06 = None
+        if isinstance(target, Pose):
+            t06 = self.pose2t06(target) 
+        else:
+            t06 = self.mat2t06(target)
         p = Kinematics.mat2pose(t06)
 
         lbd = self.lb - self.ld
@@ -508,16 +515,19 @@ class Kinematics:
 
 class Controller:
     EMsgKey = enum.Enum("EMsgKey", "msg_type target callback")
-    EConType = enum.Enum("EConType", "move_ptp torque home")
+    EConType = enum.Enum("EConType", "move_ptp move_line torque home")
     EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose link_pose")
+    EConErr = enum.Enum("EConErr", "none")
 
     @classmethod
     def tenth_deg(cls, deg):
         return int(round(deg * 10.0, 0))
 
-    def __init__(self, controll_period = 20.0, max_speed = 240.0 / 1000.0, loglv = Logger.ELogLevel.DEBUG):
+    def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 150.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = Logger.ELogLevel.DEBUG):
         Logger.level = loglv 
-        self.max_speed = max_speed # deg per msec
+        self.joint_speed_max = joint_speed_max # deg per msec
+        self.transition_speed_max = transition_speed_max # mm per msec
+        self.rotation_speed_max = rotation_speed_max # deg per msec
         self.controll_period = controll_period # msec
         self.status = {}
         self.status[Controller.EStatKey.pose] = Pose() 
@@ -559,73 +569,90 @@ class Controller:
                 self.__update_pose()
                 self.__callback(msg) 
 
-            elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.move_ptp:
-                Logger.log(Logger.ELogLevel.INFO_, "move_ptp, start")
+            elif msg[Controller.EMsgKey.msg_type] is Controller.EConType.move_ptp or msg[Controller.EMsgKey.msg_type] is Controller.EConType.move_line:
+                Logger.log(Logger.ELogLevel.INFO_, "%s, start", msg[Controller.EMsgKey.msg_type].name)
                 self.status[Controller.EStatKey.busy] = True
-                trajectory = []
                 target = msg[Controller.EMsgKey.target]
                 current = self.status[Controller.EStatKey.joint]
+                trajectory = None
+                err = self.EConErr.none 
+                if msg[Controller.EMsgKey.msg_type] is Controller.EConType.move_ptp:
+                    err, trajectory = self.__trajectory_joint(msg, target, current)
+                else:
+                    err, trajectory = self.__trajectory_space(msg, target, current)
 
-                if isinstance(target, Pose):
-                    Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_pose = %s", target)
-                    err, target = self.kinematics.inverse(target, current)
-                    if err is not Kinematics.EKinErr.none:
-                        Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
-                        self.__callback(msg, err)
-                        continue
+                if err.name == "none":
+                    periods = 0 
+                    for id in range(6): 
+                        if periods < len(trajectory[id]):
+                            periods = len(trajectory[id])
 
-                err = Kinematics.EKinErr.none 
-                for id in range(6):
-                    if target.data[id] <= self.kinematics.joint_limit_deg[id][0] or target.data[id] >= self.kinematics.joint_limit_deg[id][1]:
-                        err = Kinematics.EKinErr.out_of_range 
-                        Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
-                        self.__callback(msg, err)
-                if err is not Kinematics.EKinErr.none:
-                    continue
-
-
-                Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
-                for id in range(6): 
-                    trajectory.append(
-                            self.trajectory.interporate_joint(
-                                current.data[id], 
-                                target.data[id], 
-                                self.max_speed))
-                
-                periods = 0 
-                for id in range(6): 
-                    if periods < len(trajectory[id]):
-                        periods = len(trajectory[id])
-
-                interval = self.controll_period / 1000.0
-                
-                for period in range(periods):
-                    Logger.log(Logger.ELogLevel.TRACE, "period = %d", period)
-                    params = []
+                    interval = self.controll_period / 1000.0
                     
+                    for period in range(periods):
+                        Logger.log(Logger.ELogLevel.TRACE, "period = %d", period)
+                        params = []
+                        
+                        for id in range(6):
+                            if len(trajectory[id]) > period:
+                                param = RS30XParameter(id, Controller.tenth_deg(trajectory[id][period]), int(self.controll_period))
+                                params.append(param)
+                                if period > 0:
+                                    self.status[Controller.EStatKey.joint].data[id] = trajectory[id][period - 1]
+                        self.controller.move(params)
+                        self.__update_pose(False)
+                        gevent.sleep(interval)
+
                     for id in range(6):
-                        if len(trajectory[id]) > period:
-                            param = RS30XParameter(id, Controller.tenth_deg(trajectory[id][period]), int(self.controll_period))
-                            params.append(param)
-                            if period > 0:
-                                self.status[Controller.EStatKey.joint].data[id] = trajectory[id][period - 1]
-                    self.controller.move(params)
-                    self.__update_pose(not self.status[Controller.EStatKey.busy])
-                    gevent.sleep(interval)
+                        if len(trajectory[id]) > 0:
+                            self.status[Controller.EStatKey.joint].data[id] = trajectory[id][len(trajectory[id]) - 1]
 
-                for id in range(6):
-                    self.status[Controller.EStatKey.joint].data[id] = target.data[id]
-
+                    self.__update_pose(True)
+                else:
+                    Logger.log(Logger.ELogLevel.ERROR, "%s, error, %s", msg[Controller.EMsgKey.msg_type].name, err.name)
+                
                 self.status[Controller.EStatKey.busy] = False 
-                self.__update_pose(not self.status[Controller.EStatKey.busy])
-                self.__callback(msg) 
-                Logger.log(Logger.ELogLevel.INFO_, "move_ptp, end")
+                self.__callback(msg, err) 
+                Logger.log(Logger.ELogLevel.INFO_, "%s, end", msg[Controller.EMsgKey.msg_type].name)
             
             else:
                 Logger.log(Logger.ELogLevel.ERROR, "invalid message type, msg = %s", msg)
             
             gevent.sleep(0)
-    
+
+    def __trajectory_joint(self, msg, target, current):
+        trajectory = []
+        if isinstance(target, Pose):
+            Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_pose = %s", target)
+            err, target = self.kinematics.inverse(target, current)
+            if err is not Kinematics.EKinErr.none:
+                Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
+                self.__callback(msg, err)
+                return err, None
+
+        err = Kinematics.EKinErr.none 
+        for id in range(6):
+            if target.data[id] <= self.kinematics.joint_limit_deg[id][0] or target.data[id] >= self.kinematics.joint_limit_deg[id][1]:
+                err = Kinematics.EKinErr.out_of_range 
+                Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
+                self.__callback(msg, err)
+        if err is not Kinematics.EKinErr.none:
+            return err, None
+
+        Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
+        for id in range(6): 
+            trajectory.append(
+                    self.trajectory.interpolate_joint(
+                        current.data[id], 
+                        target.data[id], 
+                        self.joint_speed_max))
+        return err, trajectory
+
+    def __trajectory_space(self, msg, target, current):
+        src_pose = self.status[Controller.EStatKey.pose]
+        err, trajectory = self.trajectory.interpolate_space(src_pose, current, target, self.joint_speed_max, self.transition_speed_max, self.rotation_speed_max)
+        return err, trajectory
+
     def __update_pose(self, report = True):
         self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint_pose], self.status[Controller.EStatKey.link_pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
         if self.notifier is not None:
@@ -660,6 +687,15 @@ class Controller:
                 }
         gevent.spawn(self.__send_message_wait_reply, message)
 
+    def move_line(self, target):
+        callback = AsyncResult()
+        message = {
+                Controller.EMsgKey.msg_type: Controller.EConType.move_line, 
+                Controller.EMsgKey.target: target,
+                Controller.EMsgKey.callback: callback
+                }
+        gevent.spawn(self.__send_message_wait_reply, message)
+
     def torque(self, target = True):
         callback = AsyncResult()
         message = {
@@ -681,27 +717,29 @@ class Controller:
         self.notifier = notifier
 
 class Trajectory:
+    ETrajErr = enum.Enum("ETrajErr", "none")
+
     def __init__(self, controller):
         self.controller = controller
     
     def get_last_period_poly5d(self, src, dest, max_speed):
         return int( np.ceil( np.abs ( ( 15.0 * ( dest - src ) / ( 8.0 * max_speed ) ) / self.controller.controll_period ) ) )
 
-    def get_last_period_space(self, src_pose, dest_pose, max_speed):
+    def get_last_period_space_transition(self, src_pose, dest_pose, max_speed):
         dx = dest_pose.px() - src_pose.px()
         dy = dest_pose.py() - src_pose.py()
         dz = dest_pose.pz() - src_pose.pz()
         dest = (dx ** 2.0 + dy ** 2.0 + dz ** 2.0) ** 0.5
-        return self.get_last_period_poly5d(self, 0.0, dest, max_speed)
+        return self.get_last_period_poly5d(0.0, dest, max_speed)
 
-    def interporate_joint(self, src_, dest_, max_speed_):
+    def interpolate_joint(self, src_, dest_, joint_speed_max_):
         trajectory = []
         src = float(src_)
         dest = float(dest_)
         controll_period = float(self.controller.controll_period)
-        max_speed = float(max_speed_)
-        last_period = self.get_last_period_poly5d(src, dest, max_speed)
-        Logger.log(Logger.ELogLevel.INFO_, "interporate_poly5d start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
+        joint_speed_max = float(joint_speed_max_)
+        last_period = self.get_last_period_poly5d(src, dest, joint_speed_max)
+        Logger.log(Logger.ELogLevel.INFO_, "interpolate_poly5d start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
         
         for i in range(1, last_period + 1, 1):
             pos = self.resolve_poly5d(src, dest, i, last_period)
@@ -715,20 +753,24 @@ class Trajectory:
         last_period = float(last_period_)
         return src + ( dest - src ) * ( ( period / last_period ) ** 3.0 ) * ( 10.0 - 15.0 * period / last_period + 6.0 * ( ( period / last_period ) ** 2.0 ) )
 
-    def interporate_space(self, src_pose, src_joint, dest_pose, max_speed_):
+    def interpolate_space(self, src_pose, src_joint, dest_pose, joint_speed_max, transition_speed_max, rotation_speed_max):
+        print src_pose
+        print dest_pose
+        err = self.ETrajErr.none 
         trajectory = []
-        tbh_src = src_pose.pose2mat()
-        tbh_dest = dest_pose.pose2mat()
+        for i in range(6):
+            trajectory.append([])
+        tbh_src = self.controller.kinematics.pose2mat(src_pose)
+        tbh_dest =self.controller.kinematics.pose2mat(dest_pose)
         inv_tbh_src = np.linalg.inv(tbh_src)
         dtf = np.dot(inv_tbh_src, tbh_dest)
+        print dtf
         a3 = dtf[(2,2)]
+        print a3
         a3a3 = a3 ** 2.0
         controll_period = float(self.controller.controll_period)
-        max_speed = float(max_speed_)
-        last_period = self.get_last_period_space(src_pose, dest_pose, max_speed)
+        last_period_transition = self.get_last_period_space_transition(src_pose, dest_pose, transition_speed_max)
         l = (dtf[(0,2)] ** 2.0 + dtf[(1,2)] ** 2.0) ** 0.5
-        dest_alpha = np.arctan2(l, dtf[(2,2)])
-        dest_beta = np.arctan2(dtf[(1,0)] - dtf[(0,2)], dtf[(0,0)] + dtf[(1,2)])
         b = np.matrix([
             [-dtf[(1,2)]],
             [dtf[(0,2)]],
@@ -738,33 +780,65 @@ class Trajectory:
         bx = b[(0,0)]
         by = b[(1,0)]
         bz = b[(2,0)]
-        i3 = numpy.matrix(numpy.indentity(3))
+        i3 = np.matrix(np.identity(3))
         lamda_b = np.matrix([
             [0.0,-bz, by],
             [ bz,0.0,-bx],
             [-by, bx,0.0]
             ])
-       
+      
+        rot_b = None
+        dest_alpha = 0.0 
+        dest_beta = 0.0 
+
+        if self.controller.kinematics.nearly_equals(a3, 1.0):
+            rot_b = np.matrix(np.identity(4))
+            dest_beta = np.arctan2(dtf[(1,0)], dtf[(0,0)])
+        elif self.controller.kinematics.nearly_equals(a3, -1.0):
+            dest_alpha = np.pi
+            dest_beta = np.arctan2(dtf[(1,0)], dtf[(0,0)]) + np.pi
+        else:
+            dest_alpha = np.arctan2(l, dtf[(2,2)])
+            dest_beta = np.arctan2(dtf[(1,0)] - dtf[(0,1)], dtf[(0,0)] + dtf[(1,1)])
+        
+        last_period_rotation_alpha = self.get_last_period_poly5d(0, dest_alpha, rotation_speed_max)
+        last_period_rotation_beta  = self.get_last_period_poly5d(0, dest_beta , rotation_speed_max)
+
+        last_period = last_period_transition
+        if last_period < last_period_rotation_alpha:
+            last_period = last_period_rotation_alpha
+        if last_period < last_period_rotation_beta:
+            last_period = last_period_rotation_beta
+
         last_joint = src_joint
         for i in range(1, last_period + 1, 1):
-            x = self.resolve_poly5d(0.0, dest_pose.px() - src_pose.px(), i, last_period)
-            y = self.resolve_poly5d(0.0, dest_pose.py() - src_pose.py(), i, last_period)
-            z = self.resolve_poly5d(0.0, dest_pose.pz() - src_pose.pz(), i, last_period)
-            if self.controller.kinematics.nearly_equals(a3a3, 1.0):
-                alpha_t = self.resolve_poly5d(0.0, dest_alpha, i. last_period)
+            x = self.resolve_poly5d(0.0, dtf[(0,3)], i, last_period)
+            y = self.resolve_poly5d(0.0, dtf[(1,3)], i, last_period)
+            z = self.resolve_poly5d(0.0, dtf[(2,3)], i, last_period)
+ 
+            beta_t = self.resolve_poly5d(0.0, dest_beta, i, last_period)
+            rot_z = self.controller.kinematics.get_rz(beta_t)
+            
+            if self.controller.kinematics.nearly_equals(a3, -1.0):
+                rot_b = self.controller.kinematics.get_ry(alpha_t)
+            elif not self.controller.kinematics.nearly_equals(a3, 1.0):
+                alpha_t = self.resolve_poly5d(0.0, dest_alpha, i, last_period)
                 c_alpha_t = np.cos(alpha_t)
                 v_alpha_t = 1.0 - c_alpha_t
                 s_alpha_t = np.sin(alpha_t)
                 rot_b = c_alpha_t * i3 + v_alpha_t * np.dot(b, b.T) + s_alpha_t * lamda_b
                 rot_b = np.c_[rot_b, np.matrix([[0.0],[0.0],[0.0]])]
                 rot_b = np.r_[rot_b, np.matrix([[0.0, 0.0, 0.0, 1.0]])]
-                beta_t = self.resolve_poly5d(0.0, dest_alpha, i. last_period)
-                rot_z = self.controller.kinematics.get_rz(beta_t)
-                dt = np.dot(self.controller.kinematics.get_trans(x,y,z), rot_b)
-                dt = np.dot(dt, rot_z)
-                np.dot(tbh_src, dt)
-
-        return trajectory
+           
+            dt = np.dot(self.controller.kinematics.get_trans(x,y,z), rot_b)
+            dt = np.dot(dt, rot_z)
+            err, next_joint = self.controller.kinematics.inverse(np.dot(tbh_src, dt), last_joint)
+            if err.name != "none":
+                return err, None
+            for id in range(6):
+                trajectory[id].append(next_joint.data[id])
+            last_joint = next_joint
+        return err, trajectory
 
 #
 # main code

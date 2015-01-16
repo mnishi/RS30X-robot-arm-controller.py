@@ -15,7 +15,11 @@ $(document).ready(function(){
     $("#Volume").buttonset();
     $("#Volume_Medium").prop("checked", true);
     $("#Volume").buttonset("refresh");
-    
+
+    $("#Interpolation").buttonset();
+    $("#Interpolation_line").prop("checked", true);
+    $("#Interpolation").buttonset("refresh");
+     
     $("#Pose_PX_Dec").button(); 
     $("#Pose_PY_Dec").button();
     $("#Pose_PZ_Dec").button();
@@ -41,30 +45,30 @@ $(document).ready(function(){
     $("#Joint_J5_Inc").button();
     $("#Joint_J6_Inc").button();
     
-    $("#Pose_PX_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "px", direction: "dec", volume: $("#Volume :radio:checked").val()}))}); 
-    $("#Pose_PY_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "py", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_PZ_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "pz", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_RX_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rx", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_RY_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "ry", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_RZ_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rz", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_PX_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "px", direction: "inc", volume: $("#Volume :radio:checked").val()}))}); 
-    $("#Pose_PY_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "py", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_PZ_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "pz", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_RX_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rx", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_RY_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "ry", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Pose_RZ_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rz", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J1_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j1", direction: "dec", volume: $("#Volume :radio:checked").val()}))}); 
-    $("#Joint_J2_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j2", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J3_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j3", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J4_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j4", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J5_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j5", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J6_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j6", direction: "dec", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J1_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j1", direction: "inc", volume: $("#Volume :radio:checked").val()}))}); 
-    $("#Joint_J2_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j2", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J3_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j3", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J4_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j4", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J5_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j5", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
-    $("#Joint_J6_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j6", direction: "inc", volume: $("#Volume :radio:checked").val()}))});        
+    $("#Pose_PX_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "px", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))}); 
+    $("#Pose_PY_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "py", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_PZ_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "pz", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_RX_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rx", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_RY_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "ry", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_RZ_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rz", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_PX_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "px", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))}); 
+    $("#Pose_PY_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "py", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_PZ_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "pz", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_RX_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rx", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_RY_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "ry", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Pose_RZ_Inc").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "rz", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J1_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j1", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))}); 
+    $("#Joint_J2_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j2", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J3_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j3", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J4_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j4", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J5_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j5", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J6_Dec").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j6", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J1_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j1", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))}); 
+    $("#Joint_J2_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j2", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J3_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j3", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J4_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j4", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J5_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j5", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
+    $("#Joint_J6_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j6", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
 
 });
 

@@ -9,10 +9,11 @@ from RS30X.RS30X import *
 class RS30XControllerWebSocketApplication(WebSocketApplication):
     EMsgKey = enum.Enum("EMsgKey", "msg_type client")
     EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog")
-    EJogParam = enum.Enum("EJogParam", "target_type target direction volume")
+    EJogParam = enum.Enum("EJogParam", "target_type target direction volume interpolate_type")
     EJogDir = enum.Enum("EJogDir", "dec inc")
     EJogVol = enum.Enum("EJogVol", "small medium large")
     EJogTarType = enum.Enum("EJogTarType", "pose joint")
+    EJogIntpType = enum.Enum("EJogIntpType", "line ptp")
     EPoseComp = enum.Enum("EPoseComp", "px py pz rx ry rz")
     EJointComp = enum.Enum("EJointComp", "j1 j2 j3 j4 j5 j6")
 
@@ -50,7 +51,10 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
       if msg[cls.EJogParam.direction] is cls.EJogDir.dec:
           volume = -volume
       target.data[index] = target.data[index] + volume
-      cls.controller.move_ptp(target)
+      if msg[cls.EJogParam.target_type] is cls.EJogTarType.pose and msg[cls.EJogParam.interpolate_type] is cls.EJogIntpType.line:
+          cls.controller.move_line(target)
+      else:
+          cls.controller.move_ptp(target)
 
     def __handle_message(self):
         msg = None
@@ -83,7 +87,8 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
                 self.EMsgKey.msg_type: self.EMsgType.jog,
                 self.EJogParam.target_type: self.EJogTarType.__members__[recvmes[self.EJogParam.target_type.name]],
                 self.EJogParam.direction: self.EJogDir.__members__[recvmes[self.EJogParam.direction.name]],
-                self.EJogParam.volume: self.EJogVol.__members__[recvmes[self.EJogParam.volume.name]]
+                self.EJogParam.volume: self.EJogVol.__members__[recvmes[self.EJogParam.volume.name]],
+                self.EJogParam.interpolate_type: self.EJogIntpType.__members__[recvmes[self.EJogParam.interpolate_type.name]]
                 }
             if msg[self.EJogParam.target_type] is self.EJogTarType.pose: 
                 msg[self.EJogParam.target] = self.EPoseComp.__members__[recvmes[self.EJogParam.target.name]]

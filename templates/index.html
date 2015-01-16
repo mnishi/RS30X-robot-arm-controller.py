@@ -64,8 +64,13 @@
                                     <tr><th>RY</th><td><button id="Pose_RY_Dec">-</button><input type="text" id="Pose_RY" class="float" readonly/><input type="button" id="Pose_RY_Inc" value="+"/></td></tr>
                                     <tr><th>RZ</th><td><button id="Pose_RZ_Dec">-</button><input type="text" id="Pose_RZ" class="float" readonly/><input type="button" id="Pose_RZ_Inc" value="+"/></td></tr>
                                 </table> 
+                                <h3 class="header">Interpolation Type</h3>
+                                <div id="Interpolation">
+                                    <input type="radio" id="Interpolation_line" name="Interpolation" value="line"/><label for="Interpolation_line">Line</label>
+                                    <input type="radio" id="Interpolation_ptp" name="Interpolation" value="ptp"/><label for="Interpolation_ptp">PTP</label>
+                                </div>
                             </td>
-                            <td>
+                            <td class="half">
                                 <h3 class="header">Joint(deg)</h3>
                                 <table>
                                     <tr><th>J1</th><td><button id="Joint_J1_Dec">-</button><input type="text" id="Joint_J1" class="float" readonly/><button id="Joint_J1_Inc">+</button></div></td></tr>  
