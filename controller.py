@@ -284,7 +284,6 @@ class Kinematics:
         pose = Pose(mat[(0,3)], mat[(1,3)], mat[(2,3)])
         cy = np.sqrt(mat[(2,1)]**2.0 + mat[(2,2)]**2.0)
         if cy < Kinematics.EPS:
-            print "cy == 0"
             pose.data[3] = 0.0
             if mat[(2,0)] < 0.0:
                 pose.data[4] = np.pi / 2.0
@@ -292,7 +291,6 @@ class Kinematics:
                 pose.data[4] = -np.pi / 2.0
             pose.data[5] = np.arctan2(-mat[(0,1)], mat[(1,1)])
         else:
-            print "cy != 0"
             pose.data[3] = np.arctan2(mat[(2,1)], mat[(2,2)])
             pose.data[4] = np.arctan2(-mat[(2,0)], cy)
             pose.data[5] = np.arctan2(mat[(1,0)], mat[(0,0)])
@@ -352,7 +350,6 @@ class Kinematics:
         sol = []
         j1 = []
         
-        p = None
         t06 = None
         if isinstance(target, Pose):
             t06 = self.pose2t06(target) 
@@ -625,6 +622,9 @@ class Controller:
         if isinstance(target, Pose):
             Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_pose = %s", target)
             err, target = self.kinematics.inverse(target, current)
+            Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
+            pose_, dummy, dummy = self.kinematics.forward(target)
+            Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_pose = %s", pose_)
             if err is not Kinematics.EKinErr.none:
                 Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
                 self.__callback(msg, err)
@@ -754,8 +754,6 @@ class Trajectory:
         return src + ( dest - src ) * ( ( period / last_period ) ** 3.0 ) * ( 10.0 - 15.0 * period / last_period + 6.0 * ( ( period / last_period ) ** 2.0 ) )
 
     def interpolate_space(self, src_pose, src_joint, dest_pose, joint_speed_max, transition_speed_max, rotation_speed_max):
-        print src_pose
-        print dest_pose
         err = self.ETrajErr.none 
         trajectory = []
         for i in range(6):
@@ -764,9 +762,7 @@ class Trajectory:
         tbh_dest =self.controller.kinematics.pose2mat(dest_pose)
         inv_tbh_src = np.linalg.inv(tbh_src)
         dtf = np.dot(inv_tbh_src, tbh_dest)
-        print dtf
         a3 = dtf[(2,2)]
-        print a3
         a3a3 = a3 ** 2.0
         controll_period = float(self.controller.controll_period)
         last_period_transition = self.get_last_period_space_transition(src_pose, dest_pose, transition_speed_max)
