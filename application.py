@@ -8,12 +8,13 @@ from RS30X.RS30X import *
 
 class RS30XControllerWebSocketApplication(WebSocketApplication):
     EMsgKey = enum.Enum("EMsgKey", "msg_type client")
-    EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog")
+    EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog move")
     EJogParam = enum.Enum("EJogParam", "target_type target direction volume interpolate_type")
+    EMoveParam = enum.Enum("EMoveParam", "target_type target interpolate_type")
     EJogDir = enum.Enum("EJogDir", "dec inc")
     EJogVol = enum.Enum("EJogVol", "small medium large")
-    EJogTarType = enum.Enum("EJogTarType", "pose joint")
-    EJogIntpType = enum.Enum("EJogIntpType", "line ptp")
+    ETarType = enum.Enum("ETarType", "pose joint")
+    EIntpType = enum.Enum("EIntpType", "line ptp")
     EPoseComp = enum.Enum("EPoseComp", "px py pz rx ry rz")
     EJointComp = enum.Enum("EJointComp", "j1 j2 j3 j4 j5 j6")
 
@@ -38,7 +39,7 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
     @classmethod
     def __jog(cls, msg):
       target = None
-      if msg[cls.EJogParam.target_type] is cls.EJogTarType.pose:
+      if msg[cls.EJogParam.target_type] is cls.ETarType.pose:
           target = copy.deepcopy(cls.controller.status[cls.controller.EStatKey.pose]) 
       else:
           target = copy.deepcopy(cls.controller.status[cls.controller.EStatKey.joint]) 
@@ -51,7 +52,7 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
       if msg[cls.EJogParam.direction] is cls.EJogDir.dec:
           volume = -volume
       target.data[index] = target.data[index] + volume
-      if msg[cls.EJogParam.target_type] is cls.EJogTarType.pose and msg[cls.EJogParam.interpolate_type] is cls.EJogIntpType.line:
+      if msg[cls.EJogParam.target_type] is cls.ETarType.pose and msg[cls.EJogParam.interpolate_type] is cls.EIntpType.line:
           cls.controller.move_line(target)
       else:
           cls.controller.move_ptp(target)
@@ -68,6 +69,11 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
                 self.clients.discard(msg[self.EMsgKey.client])
             elif msg[self.EMsgKey.msg_type] is self.EMsgType.jog:
                 self.__jog(msg)
+            elif msg[self.EMsgKey.msg_type] is self.EMsgType.move:
+                if msg[self.EMoveParam.target_type] is self.ETarType.pose and msg[self.EMoveParam.interpolate_type] is self.EIntpType.line:
+                    self.controller.move_line(msg[self.EMoveParam.target])
+                else:
+                    self.controller.move_ptp(msg[self.EMoveParam.target])
             elif msg[self.EMsgKey.msg_type] is self.EMsgType.status:
                 j = self.jsonize_status() 
                 for client in self.clients:
@@ -85,15 +91,31 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
         elif recvmes[self.EMsgKey.msg_type.name] == self.EMsgType.jog.name:
             msg = { 
                 self.EMsgKey.msg_type: self.EMsgType.jog,
-                self.EJogParam.target_type: self.EJogTarType.__members__[recvmes[self.EJogParam.target_type.name]],
+                self.EJogParam.target_type: self.ETarType.__members__[recvmes[self.EJogParam.target_type.name]],
                 self.EJogParam.direction: self.EJogDir.__members__[recvmes[self.EJogParam.direction.name]],
                 self.EJogParam.volume: self.EJogVol.__members__[recvmes[self.EJogParam.volume.name]],
-                self.EJogParam.interpolate_type: self.EJogIntpType.__members__[recvmes[self.EJogParam.interpolate_type.name]]
+                self.EJogParam.interpolate_type: self.EIntpType.__members__[recvmes[self.EJogParam.interpolate_type.name]]
                 }
-            if msg[self.EJogParam.target_type] is self.EJogTarType.pose: 
+            if msg[self.EJogParam.target_type] is self.ETarType.pose: 
                 msg[self.EJogParam.target] = self.EPoseComp.__members__[recvmes[self.EJogParam.target.name]]
             else:
                 msg[self.EJogParam.target] = self.EJointComp.__members__[recvmes[self.EJogParam.target.name]]
+            self.queue.put(msg)
+        elif recvmes[self.EMsgKey.msg_type.name] == self.EMsgType.move.name:
+            msg = { 
+                self.EMsgKey.msg_type: self.EMsgType.move,
+                self.EMoveParam.target_type: self.ETarType.__members__[recvmes[self.EMoveParam.target_type.name]],
+                self.EMoveParam.interpolate_type: self.EIntpType.__members__[recvmes[self.EMoveParam.interpolate_type.name]]
+                }
+            target = None
+            from controller import Pose, Joint
+            if msg[self.EMoveParam.target_type] is self.ETarType.pose: 
+                target = Pose()
+            else:
+                target = Joint()
+            for i in range(6):
+                target.data[i] = recvmes[self.EJogParam.target.name][i]
+            msg[self.EMoveParam.target] = target
             self.queue.put(msg)
         else:
             Logger.log(Logger.ELogLevel.ERROR, "invalid message, msg = %s", recvmes)

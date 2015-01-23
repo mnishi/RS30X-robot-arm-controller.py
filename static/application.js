@@ -11,6 +11,7 @@ ws.onopen = function(){
     ws.send(JSON.stringify({msg_type: "status"}));
 };
 
+var points = [];
 $(document).ready(function(){
     $("#Volume").buttonset();
     $("#Volume_Medium").prop("checked", true);
@@ -32,6 +33,7 @@ $(document).ready(function(){
     $("#Pose_RX_Inc").button();
     $("#Pose_RY_Inc").button();
     $("#Pose_RZ_Inc").button();
+    $("#Pose_Teach").button();
     $("#Joint_J1_Dec").button(); 
     $("#Joint_J2_Dec").button();
     $("#Joint_J3_Dec").button();
@@ -44,6 +46,7 @@ $(document).ready(function(){
     $("#Joint_J4_Inc").button();
     $("#Joint_J5_Inc").button();
     $("#Joint_J6_Inc").button();
+    $("#Joint_Teach").button();
     
     $("#Pose_PX_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "px", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))}); 
     $("#Pose_PY_Dec").click( function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "pose",  target: "py", direction: "dec", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
@@ -70,16 +73,59 @@ $(document).ready(function(){
     $("#Joint_J5_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j5", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
     $("#Joint_J6_Inc").click(function(event){ws.send(JSON.stringify({msg_type: "jog", target_type: "joint", target: "j6", direction: "inc", volume: $("#Volume :radio:checked").val(), interpolate_type: $("#Interpolation :radio:checked").val()}))});        
 
+    $("#Move").button();
+    $("#Move").click(function(event){
+        target = $("#Points option:selected").val();
+        point = points[target]
+        if(target != undefined){
+            ws.send(JSON.stringify({
+                msg_type: "move", 
+                target_type: point[0], 
+                target: point[1], 
+                interpolate_type: $("#Interpolation :radio:checked").val()
+            }))
+            }});
+    $("#Pose_Teach").click( function(event){ 
+        $("#Points").append("<option value='" + points.length + "'>" + pose2str(stat.pose) + "</option>"); 
+        point = ["pose", stat.pose];
+        points.push(point);
+    });
+
+    $("#Joint_Teach").click( function(event){ 
+        $("#Points").append("<option value='" + points.length + "'>" + joint2str(stat.joint) + "</option>"); 
+        point = ["joint", stat.joint];
+        points.push(point);
+    });
 });
 
 function toFixed(num){
     return num.toFixed(3)
 }
 
+function pose2str(pose){
+    str = "Pose (";
+    for(var i = 0; i < 6; i++){
+        if(i != 0) str = str + " ,";
+        str = str + toFixed(pose[i]);
+    }
+    str = str + ")";
+    return str; 
+}
+
+function joint2str(joint){
+    str = "Joint (";
+    for(var i = 0; i < 6; i++){
+        if(i != 0) str = str + " ,";
+        str = str + toFixed(joint[i]);
+    }
+    str = str + ")";
+    return str; 
+}
+
 var stat
 var stat_initialized = false
 function show_status(s){
-    stat = s
+    stat = s;
 
     if(stat_initialized == false){
         threeStart();
@@ -123,7 +169,7 @@ function initCamera() {
     camera.up.y = 0;
     camera.up.z = 1;
     camera.lookAt( {x:0, y:0, z:100 } );
-    var controls = new THREE.OrbitControls(camera);  
+    var controls = new THREE.OrbitControls(camera, renderer.domElement);  
     controls.update(); 
 }
 

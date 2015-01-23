@@ -19,6 +19,9 @@
                 height: 480px;
                 background-color: #EEEEEE;
             }
+            .points {
+                width: 28em;
+            }            
             .jog {
                 vertical-align: top;
                 width: 50em;
@@ -30,7 +33,8 @@
             .full {
                 vertical-align: top;
                 width: 100%;
-          </style>
+            }
+        </style>
         <script type="text/javascript" src="static/jquery.min.js"></script>
         <script type="text/javascript" src="static/jquery-ui.min.js"></script>
         <script type="text/javascript" src="static/three.min.js"></script>
@@ -38,14 +42,14 @@
         <script type="text/javascript" src="static/application.js"></script>
     </head>
     <body>
-        <h2>RS30X Robotic Arm Controller</h2>
+        <h1>RS30X Robotic Arm Controller</h1>
         <table>
             <tr>
                 <td class="jog">
                     <table class="full">
                         <tr>
                             <td colspan="2">
-                                <h3 class="header">Amount of Movement</h3>
+                                <h2 class="header">Amount of Movement</h2>
                                 <div id="Volume">
                                     <input type="radio" id="Volume_Small" name="Volume" value="small"/><label for="Volume_Small">0.10</label>
                                     <input type="radio" id="Volume_Medium" name="Volume" value="medium"/><label for="Volume_Medium">1.00</label>
@@ -55,7 +59,7 @@
                         </tr>
                         <tr>
                             <td class="half">
-                                <h3 class="header">Pose(mm)</h3>
+                                <h2 class="header">Pose(mm)</h2>
                                 <table>
                                     <tr><th>PX</th><td><button id="Pose_PX_Dec">-</button><input type="text" id="Pose_PX" class="float" readonly/><input type="button" id="Pose_PX_Inc" value="+"/></td></tr>
                                     <tr><th>PY</th><td><button id="Pose_PY_Dec">-</button><input type="text" id="Pose_PY" class="float" readonly/><input type="button" id="Pose_PY_Inc" value="+"/></td></tr> 
@@ -63,15 +67,16 @@
                                     <tr><th>RX</th><td><button id="Pose_RX_Dec">-</button><input type="text" id="Pose_RX" class="float" readonly/><input type="button" id="Pose_RX_Inc" value="+"/></td></tr>
                                     <tr><th>RY</th><td><button id="Pose_RY_Dec">-</button><input type="text" id="Pose_RY" class="float" readonly/><input type="button" id="Pose_RY_Inc" value="+"/></td></tr>
                                     <tr><th>RZ</th><td><button id="Pose_RZ_Dec">-</button><input type="text" id="Pose_RZ" class="float" readonly/><input type="button" id="Pose_RZ_Inc" value="+"/></td></tr>
-                                </table> 
-                                <h3 class="header">Interpolation Type</h3>
+                                </table>
+                                <button id="Pose_Teach">Teach</button>
+                                <h2 class="header">Interpolation Type</h2>
                                 <div id="Interpolation">
                                     <input type="radio" id="Interpolation_line" name="Interpolation" value="line"/><label for="Interpolation_line">Line</label>
                                     <input type="radio" id="Interpolation_ptp" name="Interpolation" value="ptp"/><label for="Interpolation_ptp">PTP</label>
                                 </div>
                             </td>
                             <td class="half">
-                                <h3 class="header">Joint(deg)</h3>
+                                <h2 class="header">Joint(deg)</h2>
                                 <table>
                                     <tr><th>J1</th><td><button id="Joint_J1_Dec">-</button><input type="text" id="Joint_J1" class="float" readonly/><button id="Joint_J1_Inc">+</button></div></td></tr>  
                                     <tr><th>J2</th><td><button id="Joint_J2_Dec">-</button><input type="text" id="Joint_J2" class="float" readonly/><button id="Joint_J2_Inc">+</button></div></td></tr> 
@@ -80,6 +85,15 @@
                                     <tr><th>J5</th><td><button id="Joint_J5_Dec">-</button><input type="text" id="Joint_J5" class="float" readonly/><button id="Joint_J5_Inc">+</button></div></td></tr>
                                     <tr><th>J6</th><td><button id="Joint_J6_Dec">-</button><input type="text" id="Joint_J6" class="float" readonly/><button id="Joint_J6_Inc">+</button></div></td></tr>
                                 </table> 
+                                <button id="Joint_Teach">Teach</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <h2 class="header">Teaching Points</h2>
+                                <select id="Points" class="points">
+                                </select>
+                                <button id="Move">Move</button>
                             </td>
                         </tr>
                     </table>

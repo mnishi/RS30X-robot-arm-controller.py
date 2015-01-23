@@ -520,7 +520,7 @@ class Controller:
     def tenth_deg(cls, deg):
         return int(round(deg * 10.0, 0))
 
-    def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 150.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = Logger.ELogLevel.DEBUG):
+    def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 200.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = Logger.ELogLevel.DEBUG):
         Logger.level = loglv 
         self.joint_speed_max = joint_speed_max # deg per msec
         self.transition_speed_max = transition_speed_max # mm per msec
@@ -623,8 +623,6 @@ class Controller:
             Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_pose = %s", target)
             err, target = self.kinematics.inverse(target, current)
             Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
-            pose_, dummy, dummy = self.kinematics.forward(target)
-            Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_pose = %s", pose_)
             if err is not Kinematics.EKinErr.none:
                 Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
                 self.__callback(msg, err)
@@ -640,15 +638,22 @@ class Controller:
             return err, None
 
         Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
+        periods = 0 
+        for id in range(6):
+            last_period = self.trajectory.get_last_period_poly5d(current.data[id], target.data[id], self.joint_speed_max)
+            if periods < last_period:
+                periods = last_period
         for id in range(6): 
             trajectory.append(
                     self.trajectory.interpolate_joint(
                         current.data[id], 
                         target.data[id], 
-                        self.joint_speed_max))
+                        self.joint_speed_max,
+                        periods))
         return err, trajectory
 
     def __trajectory_space(self, msg, target, current):
+        Logger.log(Logger.ELogLevel.INFO_,"move_line, target_pose = %s", target)
         src_pose = self.status[Controller.EStatKey.pose]
         err, trajectory = self.trajectory.interpolate_space(src_pose, current, target, self.joint_speed_max, self.transition_speed_max, self.rotation_speed_max)
         return err, trajectory
@@ -732,14 +737,16 @@ class Trajectory:
         dest = (dx ** 2.0 + dy ** 2.0 + dz ** 2.0) ** 0.5
         return self.get_last_period_poly5d(0.0, dest, max_speed)
 
-    def interpolate_joint(self, src_, dest_, joint_speed_max_):
+    def interpolate_joint(self, src_, dest_, joint_speed_max_, periods = None):
         trajectory = []
         src = float(src_)
         dest = float(dest_)
         controll_period = float(self.controller.controll_period)
         joint_speed_max = float(joint_speed_max_)
-        last_period = self.get_last_period_poly5d(src, dest, joint_speed_max)
-        Logger.log(Logger.ELogLevel.INFO_, "interpolate_poly5d start, src = %f, dest = %f, last_period = %d", src, dest, last_period)
+        last_period = periods
+        if last_period is None: 
+            last_period = self.get_last_period_poly5d(src, dest, joint_speed_max)
+        Logger.log(Logger.ELogLevel.TRACE, "interpolate_joint, src = %f, dest = %f, last_period = %d", src, dest, last_period)
         
         for i in range(1, last_period + 1, 1):
             pos = self.resolve_poly5d(src, dest, i, last_period)
@@ -814,11 +821,11 @@ class Trajectory:
  
             beta_t = self.resolve_poly5d(0.0, dest_beta, i, last_period)
             rot_z = self.controller.kinematics.get_rz(beta_t)
+            alpha_t = self.resolve_poly5d(0.0, dest_alpha, i, last_period)
             
             if self.controller.kinematics.nearly_equals(a3, -1.0):
                 rot_b = self.controller.kinematics.get_ry(alpha_t)
             elif not self.controller.kinematics.nearly_equals(a3, 1.0):
-                alpha_t = self.resolve_poly5d(0.0, dest_alpha, i, last_period)
                 c_alpha_t = np.cos(alpha_t)
                 v_alpha_t = 1.0 - c_alpha_t
                 s_alpha_t = np.sin(alpha_t)
