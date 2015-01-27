@@ -8,9 +8,10 @@ from RS30X.RS30X import *
 
 class RS30XControllerWebSocketApplication(WebSocketApplication):
     EMsgKey = enum.Enum("EMsgKey", "msg_type client")
-    EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog move")
+    EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog move speed")
     EJogParam = enum.Enum("EJogParam", "target_type target direction volume interpolate_type")
     EMoveParam = enum.Enum("EMoveParam", "target_type target interpolate_type")
+    ESpeedParam = enum.Enum("ESpeedParam", "target")
     EJogDir = enum.Enum("EJogDir", "dec inc")
     EJogVol = enum.Enum("EJogVol", "small medium large")
     ETarType = enum.Enum("ETarType", "pose joint")
@@ -117,12 +118,17 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
                 target.data[i] = recvmes[self.EJogParam.target.name][i]
             msg[self.EMoveParam.target] = target
             self.queue.put(msg)
+        elif recvmes[self.EMsgKey.msg_type.name] == self.EMsgType.speed.name:
+            speed_rate = float(recvmes[self.ESpeedParam.target.name])
+            self.controller.status[self.controller.EStatKey.speed_rate] = speed_rate 
+            Logger.log(Logger.ELogLevel.INFO_, "speed_rate changed, target = %f", speed_rate)
         else:
             Logger.log(Logger.ELogLevel.ERROR, "invalid message, msg = %s", recvmes)
 
     @classmethod 
     def jsonize_status(cls):
         map = {
+            cls.controller.EStatKey.speed_rate.name: cls.controller.status[cls.controller.EStatKey.speed_rate],
             cls.controller.EStatKey.pose.name: cls.controller.status[cls.controller.EStatKey.pose].data,
             cls.controller.EStatKey.joint.name: cls.controller.status[cls.controller.EStatKey.joint].data,
             cls.controller.EStatKey.busy.name: cls.controller.status[cls.controller.EStatKey.busy]}

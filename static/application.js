@@ -13,6 +13,17 @@ ws.onopen = function(){
 
 var points = [];
 $(document).ready(function(){
+    $("#Speed").spinner({
+        step: 0.1,
+        max: 1.0,
+        min: 0.1,
+        change: function(event, ui){
+            ws.send(JSON.stringify({
+                msg_type: "speed", 
+                target: $("#Speed").val(), 
+            }))}
+        });
+    
     $("#Volume").buttonset();
     $("#Volume_Medium").prop("checked", true);
     $("#Volume").buttonset("refresh");
@@ -131,6 +142,8 @@ function show_status(s){
         threeStart();
         stat_initialized = true
     }
+
+    $("#Speed").val(s.speed_rate);
 
     $("#Pose_PX").val(toFixed(s.pose[0]));    
     $("#Pose_PY").val(toFixed(s.pose[1]));    

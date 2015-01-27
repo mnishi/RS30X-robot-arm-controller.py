@@ -513,7 +513,7 @@ class Kinematics:
 class Controller:
     EMsgKey = enum.Enum("EMsgKey", "msg_type target callback")
     EConType = enum.Enum("EConType", "move_ptp move_line torque home")
-    EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose link_pose")
+    EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose link_pose speed_rate")
     EConErr = enum.Enum("EConErr", "none")
 
     @classmethod
@@ -521,12 +521,13 @@ class Controller:
         return int(round(deg * 10.0, 0))
 
     def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 200.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = Logger.ELogLevel.DEBUG):
-        Logger.level = loglv 
+        Logger.level = loglv
         self.joint_speed_max = joint_speed_max # deg per msec
         self.transition_speed_max = transition_speed_max # mm per msec
         self.rotation_speed_max = rotation_speed_max # deg per msec
         self.controll_period = controll_period # msec
         self.status = {}
+        self.status[Controller.EStatKey.speed_rate] = 0.5
         self.status[Controller.EStatKey.pose] = Pose() 
         self.status[Controller.EStatKey.joint] = Joint() 
         self.status[Controller.EStatKey.busy] = False 
@@ -640,7 +641,7 @@ class Controller:
         Logger.log(Logger.ELogLevel.INFO_,"move_ptp, target_joint = %s", target)
         periods = 0 
         for id in range(6):
-            last_period = self.trajectory.get_last_period_poly5d(current.data[id], target.data[id], self.joint_speed_max)
+            last_period = self.trajectory.get_last_period_poly5d(current.data[id], target.data[id], self.joint_speed_max * self.status[self.EStatKey.speed_rate])
             if periods < last_period:
                 periods = last_period
         for id in range(6): 
@@ -655,7 +656,7 @@ class Controller:
     def __trajectory_space(self, msg, target, current):
         Logger.log(Logger.ELogLevel.INFO_,"move_line, target_pose = %s", target)
         src_pose = self.status[Controller.EStatKey.pose]
-        err, trajectory = self.trajectory.interpolate_space(src_pose, current, target, self.joint_speed_max, self.transition_speed_max, self.rotation_speed_max)
+        err, trajectory = self.trajectory.interpolate_space(src_pose, current, target, self.joint_speed_max * self.status[self.EStatKey.speed_rate], self.transition_speed_max * self.status[self.EStatKey.speed_rate], self.rotation_speed_max * self.status[self.EStatKey.speed_rate])
         return err, trajectory
 
     def __update_pose(self, report = True):
@@ -722,7 +723,7 @@ class Controller:
         self.notifier = notifier
 
 class Trajectory:
-    ETrajErr = enum.Enum("ETrajErr", "none")
+    ETrajErr = enum.Enum("ETrajErr", "none speed_limit_over")
 
     def __init__(self, controller):
         self.controller = controller
@@ -839,6 +840,15 @@ class Trajectory:
             if err.name != "none":
                 return err, None
             for id in range(6):
+                last = src_joint.data[id]
+                if i != 1:
+                    last = trajectory[id][len(trajectory[id]) - 1]
+                next = next_joint.data[id]
+                speed = np.abs(next - last) / self.controller.controll_period # deg per msec
+                if speed > self.controller.joint_speed_max:
+                    Logger.log(Logger.ELogLevel.WARN_, "trajectory_space, speed_limit_over, id = %d, period = %d, last = %f, next = %f, speed = %f", id, i, last, next, speed)
+                    err = self.ETrajErr.speed_limit_over
+                    return err, None 
                 trajectory[id].append(next_joint.data[id])
             last_joint = next_joint
         return err, trajectory
