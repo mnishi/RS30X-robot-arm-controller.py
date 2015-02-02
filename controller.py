@@ -534,7 +534,8 @@ class Controller:
         self.controller = RS30XController()
         self.kinematics = Kinematics()
         self.queue = Queue()
-        self.notifier = None
+        self.status_notifier = None
+        self.error_notifier = None
         self.trajectory = Trajectory(self)
         gevent.spawn(self.__handle_massage)
 
@@ -661,8 +662,8 @@ class Controller:
 
     def __update_pose(self, report = True):
         self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint_pose], self.status[Controller.EStatKey.link_pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
-        if self.notifier is not None:
-            self.notifier()
+        if self.status_notifier is not None:
+            self.status_notifier()
         if report is True: 
             Logger.log(Logger.ELogLevel.INFO_, "update_pose, joint = %s", self.status[Controller.EStatKey.joint])
             Logger.log(Logger.ELogLevel.INFO_, "update_pose, pose = %s", self.status[Controller.EStatKey.pose])
@@ -681,8 +682,11 @@ class Controller:
     def __send_message_wait_reply(self, message):
         self.queue.put(message)
         Logger.log(Logger.ELogLevel.TRACE, "message send, msg = %s", message)
-        message[Controller.EMsgKey.callback].get()
-        Logger.log(Logger.ELogLevel.TRACE, "message replied, msg = %s", message)
+        error = message[Controller.EMsgKey.callback].get()
+        if error is not None:
+            self.error_notifier(error)
+        Logger.log(Logger.ELogLevel.TRACE, "message replied, msg = %s, error = %s", message, error)
+        return error 
 
     def move_ptp(self, target):
         callback = AsyncResult()
@@ -709,7 +713,8 @@ class Controller:
                 Controller.EMsgKey.target: target,
                 Controller.EMsgKey.callback: callback
                 }
-        gevent.spawn(self.__send_message_wait_reply, message)
+        g = gevent.spawn(self.__send_message_wait_reply, message)
+        return g.value
 
     def home(self):
         callback = AsyncResult()
@@ -717,10 +722,15 @@ class Controller:
                 Controller.EMsgKey.msg_type: Controller.EConType.home, 
                 Controller.EMsgKey.callback: callback
                 }
-        gevent.spawn(self.__send_message_wait_reply, message)
+        g = gevent.spawn(self.__send_message_wait_reply, message)
+        return g.value
 
-    def set_notifier(self, notifier):
-        self.notifier = notifier
+    def set_status_notifier(self, notifier):
+        self.status_notifier = notifier
+    
+    def set_error_notifier(self, notifier):
+        self.error_notifier = notifier
+
 
 class Trajectory:
     ETrajErr = enum.Enum("ETrajErr", "none speed_limit_over")

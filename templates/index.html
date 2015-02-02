@@ -19,6 +19,10 @@
                 height: 480px;
                 background-color: #EEEEEE;
             }
+            .info {
+                border: none;
+                height: 5em;
+            }
             .points {
                 width: 28em;
             }            
@@ -47,6 +51,11 @@
             <tr>
                 <td class="jog">
                     <table class="full">
+                        <tr>
+                            <td class="full" colspan="2">
+                                <div class="info" id="info"/>
+                            </td>
+                        </tr>
                         <tr>
                             <td class="half">
                                 <h2 class="header">Speed Rate</h2>
@@ -95,9 +104,7 @@
                         <tr>
                             <td colspan="2">
                                 <h2 class="header">Teaching Points</h2>
-                                <select id="Points" class="points">
-                                </select>
-                                <button id="Move">Move</button>
+                                <select id="Points" class="points"></select><br/><button id="Move">Move</button>
                             </td>
                         </tr>
                     </table>

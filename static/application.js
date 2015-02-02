@@ -4,6 +4,12 @@ ws.onmessage = function(message){
     var data = JSON.parse(message.data);
     if('status' == data.msg_type){
         show_status(data.status);
+    }else if('error' == data.msg_type){
+        if(data.error == 'none'){
+            $("#info").html('');
+        }else{
+            $("#info").html("<div class='ui-state-error ui-corner-all' style='padding: 0 .7em;'><p><span class='ui-icon ui-icon-alert' style='float: left; margin-right: .3em;'></span>" + data.error + "</p></div>");
+        }
     }
 };
 
@@ -107,6 +113,8 @@ $(document).ready(function(){
         point = ["joint", stat.joint];
         points.push(point);
     });
+
+    $("#Points").selectmenu();
 });
 
 function toFixed(num){
