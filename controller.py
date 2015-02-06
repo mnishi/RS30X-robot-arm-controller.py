@@ -513,20 +513,22 @@ class Kinematics:
 class Controller:
     EMsgKey = enum.Enum("EMsgKey", "msg_type target callback")
     EConType = enum.Enum("EConType", "move_ptp move_line torque home")
-    EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose link_pose speed_rate")
-    EConErr = enum.Enum("EConErr", "none")
+    EStatKey = enum.Enum("EStatKey", "pose joint busy joint_pose link_pose speed_rate area_check")
+    EConErr = enum.Enum("EConErr", "none prohibited_area")
 
     @classmethod
     def tenth_deg(cls, deg):
         return int(round(deg * 10.0, 0))
 
-    def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 200.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = Logger.ELogLevel.DEBUG):
+    def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 200.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = Logger.ELogLevel.DEBUG, prohibited_area = [[[1000.0, 1000.0, 10.0], [-1000.0, -1000.0, -1000.0]]]):
         Logger.level = loglv
         self.joint_speed_max = joint_speed_max # deg per msec
         self.transition_speed_max = transition_speed_max # mm per msec
         self.rotation_speed_max = rotation_speed_max # deg per msec
         self.controll_period = controll_period # msec
+        self.prohibited_area = prohibited_area;
         self.status = {}
+        self.status[Controller.EStatKey.area_check] = True 
         self.status[Controller.EStatKey.speed_rate] = 0.5
         self.status[Controller.EStatKey.pose] = Pose() 
         self.status[Controller.EStatKey.joint] = Joint() 
@@ -539,6 +541,23 @@ class Controller:
         self.trajectory = Trajectory(self)
         gevent.spawn(self.__handle_massage)
 
+    def check_prohibited(self, pose):
+        for area in self.prohibited_area:
+            ret0 = self.check_inner(area[0][0], area[1][0], pose.data[0])
+            ret1 = self.check_inner(area[0][1], area[1][1], pose.data[1])
+            ret2 = self.check_inner(area[0][2], area[1][2], pose.data[2])
+            if ret0 is True and ret1 is True and ret2 is True:
+                return True
+        return False 
+            
+    @classmethod 
+    def check_inner(cls, val1, val2, target):
+        if val1 <= target and target <= val2:
+            return True
+        if val2 <= target and target <= val1:
+            return True
+        return False
+        
     def __handle_massage(self):
         msg = None
         while True:
@@ -598,13 +617,16 @@ class Controller:
                                 params.append(param)
                                 if period > 0:
                                     self.status[Controller.EStatKey.joint].data[id] = trajectory[id][period - 1]
+                        
                         self.controller.move(params)
-                        self.__update_pose(False)
+                        err = self.__update_pose(False)
+                        if err is not self.EConErr.none:
+                            break
                         gevent.sleep(interval)
-
-                    for id in range(6):
-                        if len(trajectory[id]) > 0:
-                            self.status[Controller.EStatKey.joint].data[id] = trajectory[id][len(trajectory[id]) - 1]
+                    if err.name == "none":
+                        for id in range(6):
+                            if len(trajectory[id]) > 0:
+                                self.status[Controller.EStatKey.joint].data[id] = trajectory[id][len(trajectory[id]) - 1]
 
                     self.__update_pose(True)
                 else:
@@ -661,9 +683,14 @@ class Controller:
         return err, trajectory
 
     def __update_pose(self, report = True):
+        err = self.EConErr.none
         self.status[Controller.EStatKey.pose], self.status[Controller.EStatKey.joint_pose], self.status[Controller.EStatKey.link_pose] = self.kinematics.forward(self.status[Controller.EStatKey.joint])
         if self.status_notifier is not None:
             self.status_notifier()
+        if self.status[self.EStatKey.area_check] is True:
+            for i in range(1,8):
+                if self.check_prohibited(self.status[Controller.EStatKey.joint_pose][i]):
+                    err = self.EConErr.prohibited_area
         if report is True: 
             Logger.log(Logger.ELogLevel.INFO_, "update_pose, joint = %s", self.status[Controller.EStatKey.joint])
             Logger.log(Logger.ELogLevel.INFO_, "update_pose, pose = %s", self.status[Controller.EStatKey.pose])
@@ -674,6 +701,7 @@ class Controller:
                         Logger.log(Logger.ELogLevel.WARN_, "inverse kinematics solution does not correspond, result = %s", sol)
                 else:
                     Logger.log(Logger.ELogLevel.ERROR, "inverse kinematics error = %s", err.name)
+        return err 
 
     def __callback(self, msg, value = None):
         if msg[Controller.EMsgKey.callback] is not None:

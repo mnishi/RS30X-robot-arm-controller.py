@@ -37,7 +37,15 @@ $(document).ready(function(){
     $("#Interpolation").buttonset();
     $("#Interpolation_line").prop("checked", true);
     $("#Interpolation").buttonset("refresh");
-     
+
+    $("#Area_Check").buttonset();
+    $("#Area_Check").on("change", function(event){
+                ws.send(JSON.stringify({msg_type: "area_check", target: $("#Area_Check :radio:checked").val()})); 
+            });
+    $("#Area_Check_ON").prop("checked", true);
+    $("#Area_Check").buttonset("refresh");
+
+      
     $("#Pose_PX_Dec").button(); 
     $("#Pose_PY_Dec").button();
     $("#Pose_PZ_Dec").button();

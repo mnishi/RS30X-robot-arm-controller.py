@@ -8,7 +8,9 @@ from RS30X.RS30X import *
 
 class RS30XControllerWebSocketApplication(WebSocketApplication):
     EMsgKey = enum.Enum("EMsgKey", "msg_type client")
-    EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog move speed error")
+    EMsgType = enum.Enum("EMsgType", "add_client remove_client status jog move speed error area_check")
+    EAreaChkParam = enum.Enum("EAreaChkParam", "target")
+    EAreaChkType = enum.Enum("EAreaChkType", "on off")
     EErrParam = enum.Enum("EErrType", "error")
     EJogParam = enum.Enum("EJogParam", "target_type target direction volume interpolate_type")
     EMoveParam = enum.Enum("EMoveParam", "target_type target interpolate_type")
@@ -129,6 +131,12 @@ class RS30XControllerWebSocketApplication(WebSocketApplication):
             speed_rate = float(recvmes[self.ESpeedParam.target.name])
             self.controller.status[self.controller.EStatKey.speed_rate] = speed_rate 
             Logger.log(Logger.ELogLevel.INFO_, "speed_rate changed, target = %f", speed_rate)
+        elif recvmes[self.EMsgKey.msg_type.name] == self.EMsgType.area_check.name:
+            target = True
+            if recvmes[self.EAreaChkParam.target.name] == self.EAreaChkType.off.name:
+                target = False
+            self.controller.status[self.controller.EStatKey.area_check] = target
+            Logger.log(Logger.ELogLevel.INFO_, "area_check changed, target = %s", target)
         else:
             Logger.log(Logger.ELogLevel.ERROR, "invalid message, msg = %s", recvmes)
 
