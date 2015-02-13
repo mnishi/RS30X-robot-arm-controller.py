@@ -3,5 +3,6 @@ greenlet
 gevent
 numpy
 enum34
+pyyaml
 flask
 gevent-websocket

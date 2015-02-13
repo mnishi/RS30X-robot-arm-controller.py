@@ -3,6 +3,7 @@ import os
 import time
 import numpy as np 
 import enum 
+import yaml
 import gevent
 from gevent.queue import Queue
 from gevent.event import AsyncResult
@@ -520,8 +521,8 @@ class Controller:
     def tenth_deg(cls, deg):
         return int(round(deg * 10.0, 0))
 
-    def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 200.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = Logger.ELogLevel.DEBUG, prohibited_area = [[[1000.0, 1000.0, 10.0], [-1000.0, -1000.0, -1000.0]]]):
-        Logger.level = loglv
+    def __init__(self, controll_period = 20.0, joint_speed_max = 240.0 / 1000.0, transition_speed_max = 200.0 / 1000.0 , rotation_speed_max = 240.0 / 1000.0,loglv = 'DEBUG', prohibited_area = [[[1000.0, 1000.0, 30.0], [-1000.0, -1000.0, -1000.0]], [[60.0, 60.0, 100.0], [-60.0, -60.0, 0.0]]]):
+        Logger.level = Logger.ELogLevel.__members__[loglv]
         self.joint_speed_max = joint_speed_max # deg per msec
         self.transition_speed_max = transition_speed_max # mm per msec
         self.rotation_speed_max = rotation_speed_max # deg per msec
@@ -534,7 +535,10 @@ class Controller:
         self.status[Controller.EStatKey.joint] = Joint() 
         self.status[Controller.EStatKey.busy] = False 
         self.controller = RS30XController()
-        self.kinematics = Kinematics()
+        f = open("kineparam.yaml", "r")
+        d = yaml.load(f)
+        f.close()
+        self.kinematics = Kinematics(**d)
         self.queue = Queue()
         self.status_notifier = None
         self.error_notifier = None
@@ -905,8 +909,12 @@ if __name__ == '__main__':
 
     if len(sys.argv) > 2:
         port = int(sys.argv[2])
+    
+    f = open("ctrlparam.yaml", "r")
+    d = yaml.load(f)
+    f.close()
+    controller = Controller(**d)
 
-    controller = Controller()
     controller.torque(True)
     controller.home()
 

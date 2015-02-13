@@ -1,0 +1,6 @@
+controll_period : 20.0
+joint_speed_max : 0.240
+transition_speed_max : 0.200
+rotation_speed_max : 0.240
+loglv : DEBUG
+prohibited_area : [[[1000.0, 1000.0, 30.0], [-1000.0, -1000.0, -1000.0]], [[60.0, 60.0, 100.0], [-60.0, -60.0, 0.0]]]
