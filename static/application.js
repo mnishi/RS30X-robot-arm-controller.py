@@ -209,8 +209,8 @@ function initScene() {
 
 var light;
 function initLight() { 
-    light = new THREE.DirectionalLight(0xFFFFFF, 1.0, 0);
-    light.position.set( 150, 150, 300 );
+    light = new THREE.DirectionalLight(0xcccccc, 1.0, 0);
+    light.position.set( -100, -50, 300 );
     light.castShadow = true;
     scene.add(light);
     light2 = new THREE.AmbientLight(0x555555);
@@ -230,7 +230,7 @@ function initObject(){
     for(var i = 0; i < joint.length; i++){ 
         j = new THREE.Mesh(
                 new THREE.BoxGeometry(10, 10, 3),               
-                new THREE.MeshLambertMaterial({color: 0x6495ed, ambient: 0x6495ed})
+                new THREE.MeshPhongMaterial({color: 0x6495ed, ambient: 0x6495ed, specular: 0x888888, shininess:1000, metal:true})
                 );
         scene.add(j);
         j.position.set(0,0,0);
@@ -257,7 +257,7 @@ function renderLink(initialize){
             }else{
                 l = new THREE.Mesh(
                         new THREE.BoxGeometry(2.5, 2.5, getLinkLength(lp[i], lp[i + 1])),               
-                        new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
+                        new THREE.MeshPhongMaterial({color: 0x888888, ambient: 0x888888, specular: 0x888888, shininess:1000, metal:true})
                         );
             }
             scene.add(l);
@@ -275,7 +275,7 @@ function renderLink(initialize){
 function createLink(xoffset, yoffset, zoffset){
     return new THREE.Mesh(
             new THREE.BoxGeometry(2.5 + xoffset, 2.5 + yoffset, 2.5 + zoffset),               
-            new THREE.MeshLambertMaterial({color: 0x888888, ambient: 0x888888})
+            new THREE.MeshPhongMaterial({color: 0x888888, ambient: 0x888888, specular: 0x888888, shininess:1000, metal:true})
             );
 }
 
