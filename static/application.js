@@ -210,10 +210,10 @@ function initScene() {
 var light;
 function initLight() { 
     light = new THREE.DirectionalLight(0xcccccc, 1.0, 0);
-    light.position.set( -100, -50, 300 );
+    light.position.set( 0, 50, 500 );
     light.castShadow = true;
     scene.add(light);
-    light2 = new THREE.AmbientLight(0x555555);
+    light2 = new THREE.AmbientLight(0x888888);
     scene.add(light2);    
 }
 
@@ -221,18 +221,18 @@ var joint = new Array(9);
 function initObject(){
     p = new THREE.Mesh(
             new THREE.PlaneGeometry(400, 400),               
-            new THREE.MeshLambertMaterial({color: 0xBBBBBB, ambient: 0xBBBBBB})
+            new THREE.MeshLambertMaterial({color: 0xaaaaaa, ambient: 0xaaaaaa})
             );
     scene.add(p);
     p.position.set(0,0,0);
     p.receiveShadow = true;
 
-    for(var i = 0; i < joint.length; i++){ 
+    for(var i = 0; i < joint.length; i++){
         j = new THREE.Mesh(
                 new THREE.BoxGeometry(10, 10, 3),               
-                new THREE.MeshPhongMaterial({color: 0x6495ed, ambient: 0x6495ed, specular: 0x888888, shininess:1000, metal:true})
+                new THREE.MeshPhongMaterial({color: 0x6495ed, ambient: 0x6495ed, specular: 0x888888, shininess:10, metal:true})
                 );
-        scene.add(j);
+        if(i != 1) scene.add(j);
         j.position.set(0,0,0);
         j.rotation.order = "ZYX";
         j.rotation.set(0,0,0);
@@ -257,7 +257,7 @@ function renderLink(initialize){
             }else{
                 l = new THREE.Mesh(
                         new THREE.BoxGeometry(2.5, 2.5, getLinkLength(lp[i], lp[i + 1])),               
-                        new THREE.MeshPhongMaterial({color: 0x888888, ambient: 0x888888, specular: 0x888888, shininess:1000, metal:true})
+                        new THREE.MeshPhongMaterial({color: 0x888888, ambient: 0x888888, specular: 0x888888, shininess:10, metal:true})
                         );
             }
             scene.add(l);
@@ -275,7 +275,7 @@ function renderLink(initialize){
 function createLink(xoffset, yoffset, zoffset){
     return new THREE.Mesh(
             new THREE.BoxGeometry(2.5 + xoffset, 2.5 + yoffset, 2.5 + zoffset),               
-            new THREE.MeshPhongMaterial({color: 0x888888, ambient: 0x888888, specular: 0x888888, shininess:1000, metal:true})
+            new THREE.MeshPhongMaterial({color: 0x888888, ambient: 0x888888, specular: 0x888888, shininess:10, metal:true})
             );
 }
 
