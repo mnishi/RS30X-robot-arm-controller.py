@@ -584,7 +584,7 @@ class Controller:
                 self.status[Controller.EStatKey.busy] = True
                 home_position = [0.0, -45.0, 0.0, 0.0, -45.0, 0.0]
                 for id in range(6):
-                    self.controller.move(id, home_position[id], 300)
+                    self.controller.move(id + 1, Controller.tenth_deg(home_position[id]), 300)
                     self.status[Controller.EStatKey.joint].data[id] = home_position[id]
                 gevent.sleep(3)
                 self.status[Controller.EStatKey.busy] = False
@@ -617,7 +617,7 @@ class Controller:
                         
                         for id in range(6):
                             if len(trajectory[id]) > period:
-                                param = RS30XParameter(id, Controller.tenth_deg(trajectory[id][period]), int(self.controll_period))
+                                param = RS30XParameter(id + 1, Controller.tenth_deg(trajectory[id][period]), int(self.controll_period))
                                 params.append(param)
                                 if period > 0:
                                     self.status[Controller.EStatKey.joint].data[id] = trajectory[id][period - 1]
