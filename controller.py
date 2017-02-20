@@ -11,6 +11,7 @@ from flask import Flask, render_template
 from geventwebsocket import WebSocketServer, WebSocketApplication, Resource
 from RS30X.RS30X import *
 from application import RS30XControllerWebSocketApplication
+from collections import OrderedDict
 
 class Pose:
     def __init__(self, px = 0.0, py = 0.0, pz = 0.0, rx = 0.0, ry = 0.0, rz = 0.0):
@@ -929,10 +930,10 @@ if __name__ == '__main__':
 
     server = WebSocketServer(
             (address, port),
-            Resource({
+            Resource(OrderedDict({
                 '/'  : flask_app,
                 '/ws': RS30XControllerWebSocketApplication
-                }),
+                })),
             debug=False
             )
     server.serve_forever()
